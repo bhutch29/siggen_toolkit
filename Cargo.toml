@@ -9,3 +9,4 @@ edition = "2018"
 [dependencies]
 walkdir = "2"
 open = "2"
+structopt = "0.3"
