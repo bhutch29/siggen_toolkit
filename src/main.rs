@@ -1,91 +1,9 @@
+mod cli;
+
 use std::fs;
 use std::path::Path;
 use walkdir::WalkDir;
-use structopt::StructOpt;
-
-// SigGen Toolkit supports navigation of SigGen deployments
-
-// sgt (open GUI)
-// sgt hwconfig set
-// sgt hwconfig restore
-// sgt hwconfig show
-// sgt hwconfig path
-// sgt hwconfig open
-// sgt log set
-// sgt log show
-// sgt log path
-// sgt log open
-// sgt events show
-// sgt siggen download
-// sgt siggen list
-// sgt siggen run
-// sgt report zip
-// sgt report upload (or make it the default?)
-// sgt report list
-// sgt report download
-
-// * Upload reports to Artifactory
-
-#[derive(StructOpt, Debug)]
-#[structopt(name = "sgt", about = "Navigate SigGen deployments.\n\nRun without arguments to launch GUI.")]
-struct Sgt {
-    #[structopt(subcommand)]
-    cmd: Option<Command>
-}
-
-#[derive(StructOpt, Debug)]
-enum Command {
-    #[structopt(name = "hwconfig", about = "Simulated hardware configuration.")]
-    HwConfig(HwConfigCommand),
-    #[structopt(about = "Logging configuration.")]
-    Log(LogCommand),
-    #[structopt(name = "siggen", about = "Download or run application versions.")]
-    SigGen(SigGenCommand),
-    #[structopt(about = "Create or browse reports.")]
-    Report(ReportCommand),
-}
-
-#[derive(StructOpt, Debug)]
-enum LogCommand {
-    Set {
-        config: String,
-    }
-}
-
-#[derive(StructOpt, Debug)]
-enum ReportCommand {
-    Set {
-        config: String,
-    }
-}
-
-#[derive(StructOpt, Debug)]
-enum SigGenCommand {
-    Download {
-        version: String,
-    }
-}
-
-#[derive(StructOpt, Debug)]
-enum HwConfigCommand {
-    Set {
-        #[structopt(default_value = "2", short, long)]
-        channel_count: u8,
-        #[structopt(subcommand)]
-        config: SimulatedChannel,
-    },
-    Restore
-}
-
-#[derive(StructOpt, Debug)]
-enum SimulatedChannel {
-    MCS15,
-    #[structopt(name = "MCS3")]
-    MCS31 {
-        #[structopt(default_value = "8", short, long)]
-        signal_count: u8
-    }
-}
+use cli::*;
 
 fn serialize_channel(channel: &SimulatedChannel) -> String {
     match channel {
@@ -116,6 +34,7 @@ fn main() {
         Command::HwConfig(cmd) => {
             match cmd {
                 HwConfigCommand::Set { config, channel_count } => {}
+                HwConfigCommand::Restore => {}
             }
         }
         Command::Log(cmd) => {
