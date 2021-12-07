@@ -2,15 +2,17 @@ mod cli;
 mod hwconfig;
 
 use cli::*;
+use std::fs::File;
+use std::error::Error;
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     // TODO: move all of this into cli.rs
     let args: Sgt = Sgt::from_args();
     dbg!(&args);
     if args.cmd.is_none() {
         // TODO: launch GUI
         println!("no command");
-        return;
+        return Ok(());
     }
     match args.cmd.unwrap() {
         Command::HwConfig(cmd) => match cmd {
@@ -37,7 +39,13 @@ fn main() {
             LogCommand::Open => {}
         },
         Command::SigGen(cmd) => match cmd {
-            SigGenCommand::Download { version: _ } => {}
+            SigGenCommand::Download { version: _ } => {
+                // TODO
+                let response = reqwest::blocking::get("https://artifactory.it.keysight.com/artifactory/generic-local-pwsg/siggen/packages-linux/develop/siggen_1-9-1-9_2021-11-22_linux.zip")?;
+                let bytes = response.bytes()?;
+                let mut out = File::create("/home/bhutch/projects/SigGenToolkit/temp.zip").expect("failed to create file");
+                std::io::copy(&mut bytes.as_ref(), &mut out).expect("failed to copy content");
+            }
             SigGenCommand::List => {}
             SigGenCommand::Run { .. } => {}
         },
@@ -50,5 +58,6 @@ fn main() {
         Command::Events(cmd) => match cmd {
             EventsCommand::List { .. } => {}
         },
-    }
+    };
+    Ok(())
 }

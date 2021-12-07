@@ -10,3 +10,4 @@ edition = "2018"
 walkdir = "2"
 open = "2"
 structopt = "0.3"
+reqwest = {version = "0.11", features = ["blocking"]}
