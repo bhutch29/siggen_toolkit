@@ -1,32 +1,13 @@
 pub use structopt::StructOpt;
 
-// sgt (open GUI)
-// sgt hwconfig set
-// sgt hwconfig restore
-// sgt hwconfig show
-// sgt hwconfig path
-// sgt hwconfig open
-// sgt log set
-// sgt log show
-// sgt log path
-// sgt log open
-// sgt events show
-// sgt siggen download
-// sgt siggen list
-// sgt siggen run
-// sgt report zip
-// sgt report upload (or make it the default?)
-// sgt report list
-// sgt report download
-
-// * Upload reports to Artifactory
-
-
 #[derive(StructOpt, Debug)]
-#[structopt(name = "sgt", about = "Navigate SigGen deployments.\n\nRun without arguments to launch GUI.")]
+#[structopt(
+    name = "sgt",
+    about = "Navigate SigGen deployments.\n\nRun without arguments to launch GUI."
+)]
 pub struct Sgt {
     #[structopt(subcommand)]
-    pub cmd: Option<Command>
+    pub cmd: Option<Command>,
 }
 
 #[derive(StructOpt, Debug)]
@@ -39,27 +20,38 @@ pub enum Command {
     SigGen(SigGenCommand),
     #[structopt(about = "Create or browse reports.")]
     Report(ReportCommand),
+    #[structopt(about = "Windows Event Log viewing.")]
+    Events(EventsCommand),
 }
 
 #[derive(StructOpt, Debug)]
 pub enum LogCommand {
-    Set {
-        config: String,
-    }
+    Set {},
+    Show {},
+    Path,
+    Open,
 }
 
 #[derive(StructOpt, Debug)]
 pub enum ReportCommand {
-    Set {
-        config: String,
-    }
+    Zip {},
+    Upload {
+        // need to be separate or just have it upload as part of Zip?
+    },
+    List {},
+    Download {},
 }
 
 #[derive(StructOpt, Debug)]
 pub enum SigGenCommand {
-    Download {
-        version: String,
-    }
+    Download { version: String },
+    List,
+    Run {},
+}
+
+#[derive(StructOpt, Debug)]
+pub enum EventsCommand {
+    List,
 }
 
 #[derive(StructOpt, Debug)]
@@ -70,15 +62,18 @@ pub enum HwConfigCommand {
         #[structopt(subcommand)]
         config: SimulatedChannel,
     },
-    Restore
+    Restore,
+    Show,
+    Path,
+    Open,
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(StructOpt, Debug, Clone, Copy)]
 pub enum SimulatedChannel {
     MCS15,
     #[structopt(name = "MCS3")]
     MCS31 {
         #[structopt(default_value = "8", short, long)]
-        signal_count: u8
-    }
+        signal_count: u8,
+    },
 }
