@@ -60,11 +60,6 @@ pub fn set(config: cli::SimulatedChannel, channel_count: u8) {
     }
 }
 
-pub fn open() {
-    // let temp_path = Path::new("/home/bhutch/projects/siggen_toolkit/temp.txt");
-    // open::that_in_background(temp_path); // TODO: `that` blocks, `that_in_background` has a thread that needs handling
-}
-
 // for entry in WalkDir::new("/home/bhutch/projects/SigGenToolkit") {
 //     let entry = entry.unwrap();
 //     println!("{}", entry.path().display());

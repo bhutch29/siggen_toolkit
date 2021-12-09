@@ -30,7 +30,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
             },
             HwConfigCommand::Path => println!("{}", hwconfig::get_path().to_str().unwrap()),
-            HwConfigCommand::Open => hwconfig::open(),
         },
         Command::Log(cmd) => match cmd {
             LogCommand::Set { .. } => {}
