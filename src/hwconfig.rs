@@ -30,7 +30,7 @@ fn generate_hwconfig(config: cli::SimulatedChannel, channel_count: u8) -> String
 }
 
 pub fn get_path() -> PathBuf {
-    PathBuf::from("/home/bhutch/projects/siggen_toolkit/temp.txt")
+    PathBuf::from("/home/bhutch/projects/SigGenToolkit/temp.txt")
 }
 
 pub fn set(config: cli::SimulatedChannel, channel_count: u8) {
@@ -42,7 +42,10 @@ pub fn set(config: cli::SimulatedChannel, channel_count: u8) {
         println!("{}", text);
     };
 
-    let write_file = || fs::write(get_path(), &text).expect("Unable to write to temp.txt");
+    let write_file = || {
+        fs::create_dir_all(get_path().parent().unwrap()).expect("Unable to create parent directory");
+        fs::write(get_path(), &text).expect("Unable to write to temp.txt");
+    };
 
     match contents {
         None => {
