@@ -12,6 +12,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     if args.cmd.is_none() {
         gui::run();
     }
+
     match args.cmd.unwrap() {
         Command::HwConfig(cmd) => match cmd {
             HwConfigCommand::Set {

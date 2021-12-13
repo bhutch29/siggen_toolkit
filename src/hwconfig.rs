@@ -43,7 +43,8 @@ pub fn set(config: cli::SimulatedChannel, channel_count: u8) {
     };
 
     let write_file = || {
-        fs::create_dir_all(get_path().parent().unwrap()).expect("Unable to create parent directory");
+        fs::create_dir_all(get_path().parent().unwrap())
+            .expect("Unable to create parent directory");
         fs::write(get_path(), &text).expect("Unable to write to temp.txt");
     };
 

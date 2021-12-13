@@ -1,5 +1,5 @@
-use std::fmt;
 pub use structopt::StructOpt;
+use strum::Display;
 
 #[derive(StructOpt, Debug)]
 #[structopt(
@@ -67,25 +67,14 @@ pub enum HwConfigCommand {
     Path,
 }
 
-#[derive(StructOpt, Debug, Clone, Copy, PartialEq)]
+#[derive(StructOpt, Debug, Clone, Copy, PartialEq, Display)]
 pub enum SimulatedChannel {
+    #[strum(serialize = "MCS1.5")]
     MCS15,
+    #[strum(serialize = "MCS3.1")]
     #[structopt(name = "MCS3")]
     MCS31 {
         #[structopt(default_value = "8", short, long)]
         signal_count: u8,
     },
-}
-
-impl fmt::Display for SimulatedChannel {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            SimulatedChannel::MCS15 => {
-                write!(f, "MCS1.5")
-            }
-            SimulatedChannel::MCS31 { .. } => {
-                write!(f, "MCS3.1")
-            }
-        }
-    }
 }
