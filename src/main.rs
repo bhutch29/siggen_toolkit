@@ -4,11 +4,10 @@ mod hwconfig;
 mod logging;
 
 use cli::*;
-use std::error::Error;
-use std::fs;
 use std::fs::File;
+use anyhow::Result;
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<()> {
     let args: Sgt = Sgt::from_args();
     dbg!(&args);
     if args.cmd.is_none() {
@@ -35,34 +34,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         Command::Log(cmd) => match cmd {
             LogCommand::Set { .. } => {}
             LogCommand::Show { .. } => {
-                let a = logging::Logger {
-                    name: "logger1".to_string(),
-                    level: logging::Level::Trace,
-                    sinks: vec!["first".to_string(), "second".to_string()],
-                };
-                let b = logging::Sink::Console {
-                    level: logging::Level::Warn,
-                    name: "something".to_string(),
-                    is_color: true,
-                };
-                let d = logging::Sink::RotatingFile {
-                    level: logging::Level::Debug,
-                    name: "file".to_string(),
-                    truncate: true,
-                    max_files: 2,
-                    max_size: 1234,
-                    file_name: "temp.txt".to_string(),
-                };
-                let c = logging::LoggingConfiguration {
-                    sinks: vec![b, d],
-                    loggers: vec![a],
-                };
-                let j = serde_json::to_string_pretty(&c)?;
-                println!("{}", j);
-
-                let text = fs::read_to_string("../siggen/static/ksflogger.cfg")?;
-                let conf: logging::LoggingConfiguration = serde_json::from_str(&text)?;
-                println!("{:?}", conf);
+                logging::show()?;
             }
             LogCommand::Path => {}
         },
