@@ -4,7 +4,7 @@ pub use eframe::{egui, egui::Ui, epi};
 use std::fs;
 
 use clipboard::ClipboardProvider;
-use strum::{IntoEnumIterator, EnumIter, Display};
+use strum::{Display, EnumIter, IntoEnumIterator};
 
 #[derive(PartialEq, EnumIter, Display)]
 enum Tabs {
@@ -114,8 +114,10 @@ impl GuiApp {
             .on_hover_text("Click to copy")
             .clicked()
         {
-            let mut clip: clipboard::ClipboardContext = clipboard::ClipboardProvider::new().unwrap();
-            clip.set_contents(hwconfig::get_path().to_string_lossy().to_string()).expect("Unable to copy to clipboard");
+            let mut clip: clipboard::ClipboardContext =
+                clipboard::ClipboardProvider::new().unwrap();
+            clip.set_contents(hwconfig::get_path().to_string_lossy().to_string())
+                .expect("Unable to copy to clipboard");
         }
     }
 

@@ -22,7 +22,7 @@ fn serialize_channels(channels: &[cli::SimulatedChannel]) -> String {
 
 fn try_read_file(path: &Path) -> Option<String> {
     path.exists()
-        .then(|| fs::read_to_string(path).expect("Unable to read file"))
+        .then(|| fs::read_to_string(path).expect("Unable to read File"))
 }
 
 fn generate_hwconfig(config: cli::SimulatedChannel, channel_count: u8) -> String {
