@@ -3,9 +3,9 @@ mod gui;
 mod hwconfig;
 mod logging;
 
+use anyhow::Result;
 use cli::*;
 use std::fs::File;
-use anyhow::Result;
 
 fn main() -> Result<()> {
     let args: Sgt = Sgt::from_args();

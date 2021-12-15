@@ -1,8 +1,10 @@
 use crate::cli::SimulatedChannel;
 use crate::hwconfig;
+use crate::logging;
 pub use eframe::{egui, egui::Ui, epi};
 use std::fs;
 
+use crate::logging::Sink;
 use clipboard::ClipboardProvider;
 use strum::{Display, EnumIter, IntoEnumIterator};
 
@@ -18,6 +20,8 @@ struct GuiApp {
     selected_tab: Tabs,
     platform: SimulatedChannel,
     hwconfig_text: Option<String>,
+    ksflogger_config: Option<logging::LoggingConfiguration>,
+    // levels: Vec<logging::Level>
 }
 
 impl Default for GuiApp {
@@ -27,6 +31,8 @@ impl Default for GuiApp {
             selected_tab: Tabs::HwConfig,
             platform: SimulatedChannel::MCS31 { signal_count: 1 },
             hwconfig_text: None,
+            ksflogger_config: None,
+            // levels: vec![]
         }
     }
 }
@@ -64,6 +70,11 @@ impl epi::App for GuiApp {
         _storage: Option<&dyn epi::Storage>,
     ) {
         self.hwconfig_text = hwconfig::read();
+
+        let logging_text = fs::read_to_string("../siggen/static/ksflogger.cfg")
+            .expect("failed to read ksflogger.cfg");
+        self.ksflogger_config =
+            serde_json::from_str(&logging_text).expect("failed to deserialize ksflogger.cfg");
     }
 
     fn name(&self) -> &str {
@@ -160,7 +171,104 @@ impl GuiApp {
     }
 
     fn logging(&mut self, ui: &mut Ui) {
-        ui.heading("Logging");
+        let config = &mut self.ksflogger_config.as_mut().unwrap();
+
+        ui.columns(2, |columns| {
+            columns[0].heading("Sinks");
+            for sink in config.sinks.iter_mut() {
+                columns[0].separator();
+                columns[0].strong(sink.to_string());
+                match sink {
+                    Sink::RotatingFile {
+                        ref mut name,
+                        ref mut level,
+                        ref mut file_name,
+                        ref mut truncate,
+                        ref mut max_size,
+                        ref mut max_files
+                    } => {
+                        columns[0].horizontal(|ui| {
+                            ui.label("Name");
+                            ui.text_edit_singleline(name);
+                        });
+                        GuiApp::level_dropdown(&mut columns[0], level, name);
+                        columns[0].horizontal(|ui| {
+                            ui.label("File Path");
+                            ui.text_edit_singleline(file_name);
+                        });
+
+                        let mut trunc = truncate.is_true();
+                        columns[0].checkbox(&mut trunc, "Truncate");
+                        *truncate = logging::Bool::Boolean(trunc);
+
+                        columns[0].add(egui::Slider::new(max_files, 0..=100).text("Max Files"));
+                        columns[0].add(egui::Slider::new(max_size, 0..=5_000_000).text("Max Size"));
+                    }
+                    Sink::Console {
+                        ref mut name,
+                        ref mut level,
+                        ref mut is_color
+                    } => {
+                        columns[0].horizontal(|ui| {
+                            ui.label("Name");
+                            ui.text_edit_singleline(name);
+                        });
+                        GuiApp::level_dropdown(&mut columns[0], level, name);
+
+                        let mut color = is_color.is_true();
+                        columns[0].checkbox(&mut color, "Color");
+                        *is_color = logging::Bool::Boolean(color);
+                    }
+                }
+            }
+
+            columns[1].heading("Loggers");
+            egui::ScrollArea::vertical().show(&mut columns[1], |ui| {
+                let sinks = config.sinks.clone();
+                for logger in config.loggers.iter_mut() {
+                    ui.separator();
+                    ui.text_edit_singleline(&mut logger.name);
+                    GuiApp::level_dropdown(ui, &mut logger.level, &logger.name);
+                    GuiApp::sinks_checkboxes(ui, logger, &sinks);
+                }
+            });
+        });
+    }
+
+    fn sinks_checkboxes(ui: &mut Ui, logger: &mut logging::Logger, sinks: &Vec<logging::Sink>) {
+        let mut checkbox_for_vec = |name| {
+            let mut checked = logger.sinks.contains(name);
+            ui.checkbox(&mut checked, name);
+            if checked && !logger.sinks.contains(name) {
+                logger.sinks.push(name.clone());
+            }
+            if !checked && logger.sinks.contains(name) {
+                logger.sinks.retain(|x| x != name);
+            }
+
+            // TODO: remove any sinks from loggers that don't have a valid target sink
+        };
+
+        for sink in sinks {
+            match sink {
+                Sink::RotatingFile { name, .. } => {
+                    checkbox_for_vec(name);
+                }
+                Sink::Console { name, .. } => {
+                    checkbox_for_vec(name);
+                }
+            }
+        }
+    }
+
+    fn level_dropdown(ui: &mut Ui, level: &mut logging::Level, id: &str) {
+        egui::ComboBox::from_id_source(format!("{} Level", id))
+            .selected_text(format!("{}", level))
+            .show_ui(ui, |ui| {
+                for option in logging::Level::iter() {
+                    ui.selectable_value(level, option, option.to_string());
+                }
+            });
     }
 }
 
