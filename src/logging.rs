@@ -19,19 +19,109 @@ pub struct Logger {
 #[derive(Serialize, Deserialize, Clone, Debug, Display)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Sink {
+    File {
+        level: Level,
+        name: String,
+        file_name: String, // TODO: file_name can be optional
+        truncate: Option<Bool>,
+    },
     RotatingFile {
         level: Level,
         name: String,
         file_name: String,
-        truncate: Bool,
-        max_size: u32,
-        max_files: u8,
+        truncate: Option<Bool>,
+        max_size: Option<u32>,
+        max_files: Option<u8>,
+    },
+    DailyFile {
+        level: Level,
+        name: String,
+        file_name: String,
+        truncate: Option<Bool>,
     },
     Console {
         level: Level,
         name: String,
-        is_color: Bool,
+        is_color: Option<Bool>,
     },
+    Etw {
+        level: Level,
+        name: String,
+        activities_only: Option<Bool>, // TODO: add to GUI
+    },
+    Windiag {
+        level: Level,
+        name: String,
+    },
+    EventLog {
+        level: Level,
+        name: String,
+    },
+    Nats {
+        level: Level,
+        name: String,
+        url: String,
+    },
+}
+
+impl Sink {
+    pub fn get_name(&self) -> &String {
+        match self {
+            Sink::RotatingFile { name, .. } => name,
+            Sink::Console { name, .. } => name,
+            Sink::File { name, .. } => name,
+            Sink::DailyFile { name, .. } => name,
+            Sink::Etw { name, .. } => name,
+            Sink::Windiag { name, .. } => name,
+            Sink::EventLog { name, .. } => name,
+            Sink::Nats { name, .. } => name,
+        }
+    }
+
+    pub fn get_name_and_level_mut(&mut self) -> (&mut String, &mut Level) {
+        match self {
+            Sink::RotatingFile {
+                ref mut name,
+                ref mut level,
+                ..
+            } => (name, level),
+            Sink::Console {
+                ref mut name,
+                ref mut level,
+                ..
+            } => (name, level),
+            Sink::File {
+                ref mut name,
+                ref mut level,
+                ..
+            } => (name, level),
+            Sink::DailyFile {
+                ref mut name,
+                ref mut level,
+                ..
+            } => (name, level),
+            Sink::Etw {
+                ref mut name,
+                ref mut level,
+                ..
+            } => (name, level),
+            Sink::Windiag {
+                ref mut name,
+                ref mut level,
+                ..
+            } => (name, level),
+            Sink::EventLog {
+                ref mut name,
+                ref mut level,
+                ..
+            } => (name, level),
+            Sink::Nats {
+                ref mut name,
+                ref mut level,
+                ..
+            } => (name, level),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -41,16 +131,11 @@ pub enum Bool {
     String(String),
 }
 
-impl Bool {
-    pub fn is_true(&self) -> bool {
-        match self {
-            Bool::Boolean(b) => b.clone(),
-            Bool::String(s) => s == "true",
-        }
-    }
-
-    fn from(value: bool) -> Bool {
-        Bool::Boolean(value)
+pub fn is_true(value: &Option<Bool>) -> bool {
+    match value {
+        None => false,
+        Some(Bool::Boolean(bool)) => bool.clone(),
+        Some(Bool::String(string)) => string == "true",
     }
 }
 
@@ -64,6 +149,7 @@ pub enum Level {
     Warn,
     Error,
     Critical,
+    Off,
 }
 
 pub fn show() -> Result<()> {
@@ -75,14 +161,14 @@ pub fn show() -> Result<()> {
     let b = Sink::Console {
         level: Level::Warn,
         name: "something".to_string(),
-        is_color: Bool::from(true),
+        is_color: Some(Bool::Boolean(true)),
     };
     let d = Sink::RotatingFile {
         level: Level::Debug,
         name: "file".to_string(),
-        truncate: Bool::from(true),
-        max_files: 2,
-        max_size: 1234,
+        truncate: Some(Bool::Boolean(true)),
+        max_files: Some(2),
+        max_size: Some(1234),
         file_name: "temp.txt".to_string(),
     };
     let c = LoggingConfiguration {

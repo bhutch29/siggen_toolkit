@@ -21,7 +21,6 @@ struct GuiApp {
     platform: SimulatedChannel,
     hwconfig_text: Option<String>,
     ksflogger_config: Option<logging::LoggingConfiguration>,
-    // levels: Vec<logging::Level>
 }
 
 impl Default for GuiApp {
@@ -32,7 +31,6 @@ impl Default for GuiApp {
             platform: SimulatedChannel::MCS31 { signal_count: 1 },
             hwconfig_text: None,
             ksflogger_config: None,
-            // levels: vec![]
         }
     }
 }
@@ -71,8 +69,8 @@ impl epi::App for GuiApp {
     ) {
         self.hwconfig_text = hwconfig::read();
 
-        let logging_text = fs::read_to_string("../siggen/static/ksflogger.cfg")
-            .expect("failed to read ksflogger.cfg");
+        let logging_text =
+            fs::read_to_string("./ksflogger.cfg").expect("failed to read ksflogger.cfg");
         self.ksflogger_config =
             serde_json::from_str(&logging_text).expect("failed to deserialize ksflogger.cfg");
     }
@@ -178,46 +176,93 @@ impl GuiApp {
             for sink in config.sinks.iter_mut() {
                 columns[0].separator();
                 columns[0].strong(sink.to_string());
+
+                let (name, level) = sink.get_name_and_level_mut();
+                columns[0].horizontal(|ui| {
+                    ui.label("Name");
+                    ui.text_edit_singleline(name);
+                });
+
+                GuiApp::level_dropdown(&mut columns[0], level, name);
+
+                let mut file_name_ui = |file_name| {
+                    columns[0].horizontal(|ui| {
+                        ui.label("File Path");
+                        ui.text_edit_singleline(file_name);
+                    });
+                };
+
                 match sink {
                     Sink::RotatingFile {
-                        ref mut name,
-                        ref mut level,
                         ref mut file_name,
                         ref mut truncate,
                         ref mut max_size,
-                        ref mut max_files
+                        ref mut max_files,
+                        ..
                     } => {
-                        columns[0].horizontal(|ui| {
-                            ui.label("Name");
-                            ui.text_edit_singleline(name);
-                        });
-                        GuiApp::level_dropdown(&mut columns[0], level, name);
-                        columns[0].horizontal(|ui| {
-                            ui.label("File Path");
-                            ui.text_edit_singleline(file_name);
-                        });
+                        file_name_ui(file_name);
 
-                        let mut trunc = truncate.is_true();
+                        let mut trunc = logging::is_true(truncate);
                         columns[0].checkbox(&mut trunc, "Truncate");
-                        *truncate = logging::Bool::Boolean(trunc);
+                        *truncate = Some(logging::Bool::Boolean(trunc));
 
-                        columns[0].add(egui::Slider::new(max_files, 0..=100).text("Max Files"));
-                        columns[0].add(egui::Slider::new(max_size, 0..=5_000_000).text("Max Size"));
+                        {
+                            let mut temp = max_files.unwrap_or_default();
+                            columns[0].add(egui::Slider::new(&mut temp, 0..=100).text("Max Files"));
+                            *max_files = Some(temp);
+                        }
+
+                        {
+                            let mut temp = max_size.unwrap_or_default();
+                            columns[0]
+                                .add(egui::Slider::new(&mut temp, 0..=5_000_000).text("Max Size"));
+                            *max_size = Some(temp);
+                        }
+                    }
+                    Sink::File {
+                        ref mut file_name,
+                        ref mut truncate,
+                        ..
+                    } => {
+                        file_name_ui(file_name);
+
+                        let mut trunc = logging::is_true(truncate);
+                        columns[0].checkbox(&mut trunc, "Truncate");
+                        *truncate = Some(logging::Bool::Boolean(trunc));
+                    }
+                    Sink::DailyFile {
+                        ref mut file_name,
+                        ref mut truncate,
+                        ..
+                    } => {
+                        file_name_ui(file_name);
+
+                        let mut trunc = logging::is_true(truncate);
+                        columns[0].checkbox(&mut trunc, "Truncate");
+                        *truncate = Some(logging::Bool::Boolean(trunc));
                     }
                     Sink::Console {
-                        ref mut name,
-                        ref mut level,
-                        ref mut is_color
+                        ref mut is_color, ..
                     } => {
-                        columns[0].horizontal(|ui| {
-                            ui.label("Name");
-                            ui.text_edit_singleline(name);
-                        });
-                        GuiApp::level_dropdown(&mut columns[0], level, name);
-
-                        let mut color = is_color.is_true();
+                        let mut color = logging::is_true(is_color);
                         columns[0].checkbox(&mut color, "Color");
-                        *is_color = logging::Bool::Boolean(color);
+                        *is_color = Some(logging::Bool::Boolean(color));
+                    }
+                    Sink::Etw {
+                        ref mut activities_only,
+                        ..
+                    } => {
+                        let mut temp = logging::is_true(activities_only);
+                        columns[0].checkbox(&mut temp, "Activities Only");
+                        *activities_only = Some(logging::Bool::Boolean(temp));
+                    }
+                    Sink::Windiag { .. } => {}
+                    Sink::EventLog { .. } => {}
+                    Sink::Nats { ref mut url, .. } => {
+                        columns[0].horizontal(|ui| {
+                            ui.label("Url");
+                            ui.text_edit_singleline(url);
+                        });
                     }
                 }
             }
@@ -236,7 +281,8 @@ impl GuiApp {
     }
 
     fn sinks_checkboxes(ui: &mut Ui, logger: &mut logging::Logger, sinks: &Vec<logging::Sink>) {
-        let mut checkbox_for_vec = |name| {
+        for sink in sinks {
+            let name = sink.get_name();
             let mut checked = logger.sinks.contains(name);
             ui.checkbox(&mut checked, name);
             if checked && !logger.sinks.contains(name) {
@@ -247,17 +293,6 @@ impl GuiApp {
             }
 
             // TODO: remove any sinks from loggers that don't have a valid target sink
-        };
-
-        for sink in sinks {
-            match sink {
-                Sink::RotatingFile { name, .. } => {
-                    checkbox_for_vec(name);
-                }
-                Sink::Console { name, .. } => {
-                    checkbox_for_vec(name);
-                }
-            }
         }
     }
 
