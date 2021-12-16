@@ -16,7 +16,7 @@ pub struct Logger {
     pub sinks: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Display)]
+#[derive(Serialize, Deserialize, Clone, Debug, Display, EnumIter)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Sink {
     File {
@@ -47,7 +47,7 @@ pub enum Sink {
     Etw {
         level: Level,
         name: String,
-        activities_only: Option<Bool>, // TODO: add to GUI
+        activities_only: Option<Bool>,
     },
     Windiag {
         level: Level,
@@ -78,7 +78,7 @@ impl Sink {
         }
     }
 
-    pub fn get_name_and_level_mut(&mut self) -> (&mut String, &mut Level) {
+    pub fn get_name_and_level_as_mut(&mut self) -> (&mut String, &mut Level) {
         match self {
             Sink::RotatingFile {
                 ref mut name,
@@ -150,6 +150,12 @@ pub enum Level {
     Error,
     Critical,
     Off,
+}
+
+impl Default for Level {
+    fn default() -> Self {
+        Level::Off
+    }
 }
 
 pub fn show() -> Result<()> {

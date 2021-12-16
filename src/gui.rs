@@ -170,114 +170,152 @@ impl GuiApp {
 
     fn logging(&mut self, ui: &mut Ui) {
         let config = &mut self.ksflogger_config.as_mut().unwrap();
+        let mut sinks_to_remove = vec![];
+        let mut loggers_to_remove = vec![];
 
         ui.columns(2, |columns| {
             columns[0].heading("Sinks");
-            for sink in config.sinks.iter_mut() {
-                columns[0].separator();
-                columns[0].strong(sink.to_string());
-
-                let (name, level) = sink.get_name_and_level_mut();
-                columns[0].horizontal(|ui| {
-                    ui.label("Name");
-                    ui.text_edit_singleline(name);
-                });
-
-                GuiApp::level_dropdown(&mut columns[0], level, name);
-
-                let mut file_name_ui = |file_name| {
-                    columns[0].horizontal(|ui| {
-                        ui.label("File Path");
-                        ui.text_edit_singleline(file_name);
-                    });
-                };
-
-                match sink {
-                    Sink::RotatingFile {
-                        ref mut file_name,
-                        ref mut truncate,
-                        ref mut max_size,
-                        ref mut max_files,
-                        ..
-                    } => {
-                        file_name_ui(file_name);
-
-                        let mut trunc = logging::is_true(truncate);
-                        columns[0].checkbox(&mut trunc, "Truncate");
-                        *truncate = Some(logging::Bool::Boolean(trunc));
-
-                        {
-                            let mut temp = max_files.unwrap_or_default();
-                            columns[0].add(egui::Slider::new(&mut temp, 0..=100).text("Max Files"));
-                            *max_files = Some(temp);
-                        }
-
-                        {
-                            let mut temp = max_size.unwrap_or_default();
-                            columns[0]
-                                .add(egui::Slider::new(&mut temp, 0..=5_000_000).text("Max Size"));
-                            *max_size = Some(temp);
-                        }
+            columns[0].horizontal_wrapped(|ui| {
+                ui.label("Create New Sink:");
+                for sink in logging::Sink::iter() {
+                    if ui.button(sink.to_string()).clicked() {
+                        config.sinks.push(sink);
                     }
-                    Sink::File {
-                        ref mut file_name,
-                        ref mut truncate,
-                        ..
-                    } => {
-                        file_name_ui(file_name);
-
-                        let mut trunc = logging::is_true(truncate);
-                        columns[0].checkbox(&mut trunc, "Truncate");
-                        *truncate = Some(logging::Bool::Boolean(trunc));
-                    }
-                    Sink::DailyFile {
-                        ref mut file_name,
-                        ref mut truncate,
-                        ..
-                    } => {
-                        file_name_ui(file_name);
-
-                        let mut trunc = logging::is_true(truncate);
-                        columns[0].checkbox(&mut trunc, "Truncate");
-                        *truncate = Some(logging::Bool::Boolean(trunc));
-                    }
-                    Sink::Console {
-                        ref mut is_color, ..
-                    } => {
-                        let mut color = logging::is_true(is_color);
-                        columns[0].checkbox(&mut color, "Color");
-                        *is_color = Some(logging::Bool::Boolean(color));
-                    }
-                    Sink::Etw {
-                        ref mut activities_only,
-                        ..
-                    } => {
-                        let mut temp = logging::is_true(activities_only);
-                        columns[0].checkbox(&mut temp, "Activities Only");
-                        *activities_only = Some(logging::Bool::Boolean(temp));
-                    }
-                    Sink::Windiag { .. } => {}
-                    Sink::EventLog { .. } => {}
-                    Sink::Nats { ref mut url, .. } => {
-                        columns[0].horizontal(|ui| {
-                            ui.label("Url");
-                            ui.text_edit_singleline(url);
-                        });
-                    }
-                }
-            }
-
-            columns[1].heading("Loggers");
-            egui::ScrollArea::vertical().show(&mut columns[1], |ui| {
-                let sinks = config.sinks.clone();
-                for logger in config.loggers.iter_mut() {
-                    ui.separator();
-                    ui.text_edit_singleline(&mut logger.name);
-                    GuiApp::level_dropdown(ui, &mut logger.level, &logger.name);
-                    GuiApp::sinks_checkboxes(ui, logger, &sinks);
                 }
             });
+
+            egui::ScrollArea::vertical()
+                .id_source("sinks scrolling")
+                .show(&mut columns[0], |ui| {
+                    for (i, sink) in config.sinks.iter_mut().enumerate() {
+                        ui.separator();
+
+                        ui.horizontal(|ui| {
+                            if ui.button(" x ").on_hover_text("Remove Sink").clicked() {
+                                sinks_to_remove.push(i);
+                            }
+                            ui.strong(sink.to_string());
+                        });
+
+                        let (name, level) = sink.get_name_and_level_as_mut();
+                        ui.horizontal(|ui| {
+                            ui.label("Name");
+                            ui.text_edit_singleline(name);
+                        });
+
+                        GuiApp::level_dropdown(ui, level, format!("{} {}", name, i));
+
+                        let mut file_name_ui = |file_name| {
+                            ui.horizontal(|ui| {
+                                ui.label("File Path");
+                                ui.text_edit_singleline(file_name);
+                            });
+                        };
+
+                        match sink {
+                            Sink::RotatingFile {
+                                ref mut file_name,
+                                ref mut truncate,
+                                ref mut max_size,
+                                ref mut max_files,
+                                ..
+                            } => {
+                                file_name_ui(file_name);
+
+                                let mut trunc = logging::is_true(truncate);
+                                ui.checkbox(&mut trunc, "Truncate");
+                                *truncate = Some(logging::Bool::Boolean(trunc));
+
+                                {
+                                    let mut temp = max_files.unwrap_or_default();
+                                    ui.add(egui::Slider::new(&mut temp, 0..=50).text("Max Files"));
+                                    *max_files = Some(temp);
+                                }
+
+                                {
+                                    let mut temp = max_size.unwrap_or_default();
+                                    ui.add(
+                                        egui::Slider::new(&mut temp, 0..=5_000_000)
+                                            .text("Max Size"),
+                                    );
+                                    *max_size = Some(temp);
+                                }
+                            }
+                            Sink::File {
+                                ref mut file_name,
+                                ref mut truncate,
+                                ..
+                            } => {
+                                file_name_ui(file_name);
+
+                                let mut trunc = logging::is_true(truncate);
+                                ui.checkbox(&mut trunc, "Truncate");
+                                *truncate = Some(logging::Bool::Boolean(trunc));
+                            }
+                            Sink::DailyFile {
+                                ref mut file_name,
+                                ref mut truncate,
+                                ..
+                            } => {
+                                file_name_ui(file_name);
+
+                                let mut trunc = logging::is_true(truncate);
+                                ui.checkbox(&mut trunc, "Truncate");
+                                *truncate = Some(logging::Bool::Boolean(trunc));
+                            }
+                            Sink::Console {
+                                ref mut is_color, ..
+                            } => {
+                                let mut color = logging::is_true(is_color);
+                                ui.checkbox(&mut color, "Color");
+                                *is_color = Some(logging::Bool::Boolean(color));
+                            }
+                            Sink::Etw {
+                                ref mut activities_only,
+                                ..
+                            } => {
+                                let mut temp = logging::is_true(activities_only);
+                                ui.checkbox(&mut temp, "Activities Only");
+                                *activities_only = Some(logging::Bool::Boolean(temp));
+                            }
+                            Sink::Windiag { .. } => {}
+                            Sink::EventLog { .. } => {}
+                            Sink::Nats { ref mut url, .. } => {
+                                ui.horizontal(|ui| {
+                                    ui.label("Url");
+                                    ui.text_edit_singleline(url);
+                                });
+                            }
+                        }
+                    }
+                });
+
+            columns[1].heading("Loggers");
+            egui::ScrollArea::vertical()
+                .id_source("loggers scrolling")
+                .show(&mut columns[1], |ui| {
+                    let sinks = config.sinks.clone();
+                    for (i, logger) in config.loggers.iter_mut().enumerate() {
+                        ui.separator();
+                        ui.horizontal(|ui| {
+                            if ui.button(" - ").on_hover_text("Remove Logger").clicked() {
+                                loggers_to_remove.push(i);
+                            }
+                            ui.text_edit_singleline(&mut logger.name);
+                        });
+                        GuiApp::level_dropdown(ui, &mut logger.level, format!("{} {}", &logger.name, i));
+                        GuiApp::sinks_checkboxes(ui, logger, &sinks);
+                    }
+                });
         });
+
+        for index in sinks_to_remove {
+            config.sinks.remove(index);
+        }
+
+        for index in loggers_to_remove {
+            config.loggers.remove(index);
+        }
     }
 
     fn sinks_checkboxes(ui: &mut Ui, logger: &mut logging::Logger, sinks: &Vec<logging::Sink>) {
@@ -292,12 +330,16 @@ impl GuiApp {
                 logger.sinks.retain(|x| x != name);
             }
 
-            // TODO: remove any sinks from loggers that don't have a valid target sink
+            logger.sinks.retain(|logger_sink_name| {
+                sinks
+                    .iter()
+                    .any(|target_sink| target_sink.get_name() == logger_sink_name)
+            });
         }
     }
 
-    fn level_dropdown(ui: &mut Ui, level: &mut logging::Level, id: &str) {
-        egui::ComboBox::from_id_source(format!("{} Level", id))
+    fn level_dropdown(ui: &mut Ui, level: &mut logging::Level, id: impl std::hash::Hash) {
+        egui::ComboBox::from_id_source(id)
             .selected_text(format!("{}", level))
             .show_ui(ui, |ui| {
                 for option in logging::Level::iter() {
