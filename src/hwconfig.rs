@@ -21,8 +21,7 @@ fn serialize_channels(channels: &[cli::SimulatedChannel]) -> String {
 }
 
 fn try_read_file(path: &Path) -> Option<String> {
-    path.exists()
-        .then(|| fs::read_to_string(path).expect("Unable to read File"))
+    path.exists().then(|| fs::read_to_string(path).ok()).flatten()
 }
 
 fn generate_hwconfig(config: cli::SimulatedChannel, channel_count: u8) -> String {
@@ -43,9 +42,9 @@ pub fn set(config: cli::SimulatedChannel, channel_count: u8) {
     };
 
     let write_file = || {
-        fs::create_dir_all(get_path().parent().unwrap())
-            .expect("Unable to create parent directory");
-        fs::write(get_path(), &text).expect("Unable to write to temp.txt");
+        if fs::create_dir_all(get_path().parent().unwrap()).is_ok() {
+            fs::write(get_path(), &text).expect("Unable to write to temp.txt");
+        }
     };
 
     match contents {

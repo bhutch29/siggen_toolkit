@@ -9,6 +9,15 @@ pub struct LoggingConfiguration {
     pub loggers: Vec<Logger>,
 }
 
+impl Default for LoggingConfiguration {
+    fn default() -> Self {
+        Self {
+            sinks: vec![],
+            loggers: vec![],
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Logger {
     pub name: String,

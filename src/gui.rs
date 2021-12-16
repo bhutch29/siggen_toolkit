@@ -6,6 +6,7 @@ use std::fs;
 
 use clipboard::ClipboardProvider;
 use strum::{Display, EnumIter, IntoEnumIterator};
+use eframe::epi::egui::Color32;
 
 #[derive(PartialEq, EnumIter, Display)]
 enum Tabs {
@@ -18,10 +19,11 @@ struct HwconfigState {
     channel_count: u8,
     platform: SimulatedChannel,
     text: Option<String>,
+    write_error: bool,
 }
 
 struct LoggingState {
-    config: Option<LoggingConfiguration>,
+    config: LoggingConfiguration,
 }
 
 struct GuiApp {
@@ -37,8 +39,11 @@ impl Default for GuiApp {
                 channel_count: 1,
                 platform: SimulatedChannel::MCS31 { signal_count: 1 },
                 text: None,
+                write_error: false,
             },
-            logger: LoggingState { config: None },
+            logger: LoggingState {
+                config: Default::default(),
+            },
             selected_tab: Tabs::HwConfig,
         }
     }
@@ -78,10 +83,8 @@ impl epi::App for GuiApp {
     ) {
         self.hwconfig.text = hwconfig::read();
 
-        let logging_text =
-            fs::read_to_string("./ksflogger.cfg").expect("failed to read ksflogger.cfg");
-        self.logger.config =
-            serde_json::from_str(&logging_text).expect("failed to deserialize ksflogger.cfg");
+        let contents = fs::read_to_string("./ksflogger.cfg").unwrap_or_default();
+        self.logger.config = serde_json::from_str(&contents).unwrap_or_default();
     }
 
     fn name(&self) -> &str {
@@ -113,29 +116,32 @@ impl GuiApp {
         if ui.button("Apply Simulated Config").clicked() {
             hwconfig::set(self.hwconfig.platform, self.hwconfig.channel_count);
             self.hwconfig.text = hwconfig::read();
+            self.hwconfig.write_error = false; // cleanup any old errors
         }
 
-        if self.hwconfig.text.is_some() {
+        if let Some(ref mut text) = self.hwconfig.text {
             ui.separator();
             ui.heading("Current Hardware Configuration");
-            ui.text_edit_multiline(self.hwconfig.text.as_mut().unwrap());
+            ui.text_edit_multiline(text);
             if ui.button("Write Configuration").clicked() {
-                fs::write(hwconfig::get_path(), self.hwconfig.text.as_ref().unwrap())
-                    .expect("Failed to write custom config.")
+                self.hwconfig.write_error = fs::write(hwconfig::get_path(), text).is_err();
+            }
+
+            if self.hwconfig.write_error {
+                ui.colored_label(Color32::from_rgb(255, 0, 0), "Error writing configuration to file");
             }
         }
     }
 
     fn hwconfig_path(&mut self, ui: &mut Ui) {
         if ui
-            .selectable_label(false, hwconfig::get_path().to_str().unwrap())
+            .selectable_label(false, hwconfig::get_path().to_string_lossy())
             .on_hover_text("Click to copy")
             .clicked()
         {
-            let mut clip: clipboard::ClipboardContext =
-                clipboard::ClipboardProvider::new().unwrap();
-            clip.set_contents(hwconfig::get_path().to_string_lossy().to_string())
-                .expect("Unable to copy to clipboard");
+            if let Ok(mut clip) = clipboard::ClipboardContext::new() {
+                let _ = clip.set_contents(hwconfig::get_path().to_string_lossy().to_string());
+            }
         }
     }
 
@@ -182,7 +188,6 @@ impl GuiApp {
     }
 
     fn logging(&mut self, ui: &mut Ui) {
-        let config = &mut self.logger.config.as_mut().unwrap();
         let mut sinks_to_remove: Vec<usize> = vec![];
         let mut loggers_to_remove: Vec<usize> = vec![];
 
@@ -192,7 +197,7 @@ impl GuiApp {
                 ui.label("Create New Sink:");
                 for sink in Sink::iter() {
                     if ui.button(sink.to_string()).clicked() {
-                        config.sinks.push(sink);
+                        self.logger.config.sinks.push(sink);
                     }
                 }
             });
@@ -200,124 +205,124 @@ impl GuiApp {
             egui::ScrollArea::vertical()
                 .id_source("scroll_sinks")
                 .show(&mut columns[0], |ui| {
-                    sinks_to_remove = sinks(ui, config);
+                    sinks_to_remove = self.sinks(ui);
                 });
 
             columns[1].heading("Loggers");
             egui::ScrollArea::vertical()
                 .id_source("scroll_loggers")
                 .show(&mut columns[1], |ui| {
-                    loggers_to_remove = loggers(ui, config);
+                    loggers_to_remove = self.loggers(ui);
                 });
         });
 
         for index in sinks_to_remove {
-            config.sinks.remove(index);
+            self.logger.config.sinks.remove(index);
         }
 
         for index in loggers_to_remove {
-            config.loggers.remove(index);
+            self.logger.config.loggers.remove(index);
         }
     }
-}
 
-fn loggers(ui: &mut Ui, config: &mut LoggingConfiguration) -> Vec<usize> {
-    let mut loggers_to_remove = vec![];
-    for (i, logger) in config.loggers.iter_mut().enumerate() {
-        ui.separator();
-        ui.horizontal(|ui| {
-            if ui.button(" - ").on_hover_text("Remove Logger").clicked() {
-                loggers_to_remove.push(i);
-            }
-            ui.text_edit_singleline(&mut logger.name);
-        });
-        level_dropdown(ui, &mut logger.level, format!("{} {}", &logger.name, i));
-        sinks_checkboxes(ui, logger, &config.sinks);
+    fn loggers(&mut self, ui: &mut Ui) -> Vec<usize> {
+        let mut loggers_to_remove = vec![];
+        for (i, logger) in self.logger.config.loggers.iter_mut().enumerate() {
+            ui.separator();
+            ui.horizontal(|ui| {
+                if ui.button(" - ").on_hover_text("Remove Logger").clicked() {
+                    loggers_to_remove.push(i);
+                }
+                ui.text_edit_singleline(&mut logger.name);
+            });
+            level_dropdown(ui, &mut logger.level, format!("{} {}", &logger.name, i));
+            sinks_checkboxes(ui, logger, &self.logger.config.sinks);
+        }
+        loggers_to_remove
     }
-    loggers_to_remove
-}
 
-fn sinks(ui: &mut Ui, config: &mut LoggingConfiguration) -> Vec<usize> {
-    let mut sinks_to_remove = vec![];
-    for (i, sink) in config.sinks.iter_mut().enumerate() {
-        ui.separator();
+    fn sinks(&mut self, ui: &mut Ui) -> Vec<usize> {
+        let mut sinks_to_remove = vec![];
+        for (i, sink) in self.logger.config.sinks.iter_mut().enumerate() {
+            ui.separator();
 
-        ui.horizontal(|ui| {
-            if ui.button(" x ").on_hover_text("Remove Sink").clicked() {
-                sinks_to_remove.push(i);
-            }
-            ui.strong(sink.to_string());
-        });
+            ui.horizontal(|ui| {
+                if ui.button(" x ").on_hover_text("Remove Sink").clicked() {
+                    sinks_to_remove.push(i);
+                }
+                ui.strong(sink.to_string());
+            });
 
-        let (name, level) = sink.get_name_and_level_as_mut();
-        ui.horizontal(|ui| {
-            ui.label("Name");
-            ui.text_edit_singleline(name);
-        });
+            let (name, level) = sink.get_name_and_level_as_mut();
+            ui.horizontal(|ui| {
+                ui.label("Name");
+                ui.text_edit_singleline(name);
+            });
 
-        level_dropdown(ui, level, format!("{} {}", name, i));
+            level_dropdown(ui, level, format!("{} {}", name, i));
 
-        match sink {
-            Sink::RotatingFile {
-                ref mut file_name,
-                ref mut truncate,
-                ref mut max_size,
-                ref mut max_files,
-                ..
-            } => {
-                text_edit_labeled(ui, "File Path", file_name);
-                truncate_ui(ui, truncate);
+            match sink {
+                Sink::RotatingFile {
+                    ref mut file_name,
+                    ref mut truncate,
+                    ref mut max_size,
+                    ref mut max_files,
+                    ..
+                } => {
+                    text_edit_labeled(ui, "File Path", file_name);
+                    truncate_ui(ui, truncate);
 
-                let mut files = max_files.unwrap_or_default();
-                ui.add(egui::Slider::new(&mut files, 0..=50).text("Max Files"));
-                *max_files = Some(files);
+                    let mut files = max_files.unwrap_or_default();
+                    ui.add(egui::Slider::new(&mut files, 0..=50).text("Max Files"));
+                    *max_files = Some(files);
 
-                let mut size = max_size.unwrap_or_default();
-                ui.add(egui::Slider::new(&mut size, 0..=5_000_000).text("Max Size"));
-                *max_size = Some(size);
-            }
-            Sink::File {
-                ref mut file_name,
-                ref mut truncate,
-                ..
-            } => {
-                text_edit_labeled(ui, "File Path", file_name);
-                truncate_ui(ui, truncate);
-            }
-            Sink::DailyFile {
-                ref mut file_name,
-                ref mut truncate,
-                ..
-            } => {
-                text_edit_labeled(ui, "File Path", file_name);
-                truncate_ui(ui, truncate);
-            }
-            Sink::Console {
-                ref mut is_color, ..
-            } => {
-                let mut color = is_true(is_color);
-                ui.checkbox(&mut color, "Color");
-                *is_color = Some(Bool::Boolean(color));
-            }
-            Sink::Etw {
-                ref mut activities_only,
-                ..
-            } => {
-                let mut temp = is_true(activities_only);
-                ui.checkbox(&mut temp, "Activities Only");
-                *activities_only = Some(Bool::Boolean(temp));
-            }
-            Sink::Windiag { .. } => {}
-            Sink::EventLog { .. } => {}
-            Sink::Nats { ref mut url, .. } => {
-                ui.horizontal(|ui| {
-                    ui.label("Url");
-                    ui.text_edit_singleline(url);
-                });
+                    let mut size = max_size.unwrap_or_default();
+                    ui.add(egui::Slider::new(&mut size, 0..=5_000_000).text("Max Size"));
+                    *max_size = Some(size);
+                }
+                Sink::File {
+                    ref mut file_name,
+                    ref mut truncate,
+                    ..
+                } => {
+                    text_edit_labeled(ui, "File Path", file_name);
+                    truncate_ui(ui, truncate);
+                }
+                Sink::DailyFile {
+                    ref mut file_name,
+                    ref mut truncate,
+                    ..
+                } => {
+                    text_edit_labeled(ui, "File Path", file_name);
+                    truncate_ui(ui, truncate);
+                }
+                Sink::Console {
+                    ref mut is_color, ..
+                } => {
+                    let mut color = is_true(is_color);
+                    ui.checkbox(&mut color, "Color");
+                    *is_color = Some(Bool::Boolean(color));
+                }
+                Sink::Etw {
+                    ref mut activities_only,
+                    ..
+                } => {
+                    let mut temp = is_true(activities_only);
+                    ui.checkbox(&mut temp, "Activities Only");
+                    *activities_only = Some(Bool::Boolean(temp));
+                }
+                Sink::Windiag { .. } => {}
+                Sink::EventLog { .. } => {}
+                Sink::Nats { ref mut url, .. } => {
+                    ui.horizontal(|ui| {
+                        ui.label("Url");
+                        ui.text_edit_singleline(url);
+                    });
+                }
             }
         }
+        sinks_to_remove
     }
-    sinks_to_remove
 }
 
 fn text_edit_labeled(ui: &mut Ui, label: &str, file_name: &mut String) {
