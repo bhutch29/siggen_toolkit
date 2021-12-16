@@ -29,14 +29,13 @@ fn main() -> Result<()> {
                     println!("No hwconfig found")
                 }
             },
-            HwConfigCommand::Path => println!("{}", hwconfig::get_path().to_str().unwrap()),
+            HwConfigCommand::Path => println!("{}", hwconfig::get_path().to_string_lossy()),
         },
         Command::Log(cmd) => match cmd {
-            LogCommand::Set { .. } => {}
             LogCommand::Show { .. } => {
                 logging::show()?;
             }
-            LogCommand::Path => {}
+            LogCommand::Path => {println!("{}", logging::get_path().to_string_lossy())}
         },
         Command::SigGen(cmd) => match cmd {
             SigGenCommand::Download { version: _ } => {

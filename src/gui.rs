@@ -1,12 +1,13 @@
 use crate::cli::SimulatedChannel;
-use crate::hwconfig;
-use crate::logging::*;
+use crate::{hwconfig, logging};
+use crate::logging::{Bool, Level, Logger, LoggingConfiguration, Sink};
 pub use eframe::{egui, egui::CtxRef, egui::Ui, epi};
 use std::fs;
-
+use image;
 use clipboard::ClipboardProvider;
 use strum::{Display, EnumIter, IntoEnumIterator};
 use eframe::epi::egui::Color32;
+use std::path::PathBuf;
 
 #[derive(PartialEq, EnumIter, Display)]
 enum Tabs {
@@ -82,9 +83,7 @@ impl epi::App for GuiApp {
         _storage: Option<&dyn epi::Storage>,
     ) {
         self.hwconfig.text = hwconfig::read();
-
-        let contents = fs::read_to_string("./ksflogger.cfg").unwrap_or_default();
-        self.logger.config = serde_json::from_str(&contents).unwrap_or_default();
+        self.logger.config = logging::get_current_config();
     }
 
     fn name(&self) -> &str {
@@ -104,7 +103,7 @@ impl GuiApp {
 
     fn hwconfig(&mut self, ui: &mut Ui) {
         ui.heading("Hardware Configuration Path");
-        self.hwconfig_path(ui);
+        clickable_path(ui, hwconfig::get_path());
         ui.separator();
 
         ui.heading("Simulated Hardware Configuration");
@@ -129,18 +128,6 @@ impl GuiApp {
 
             if self.hwconfig.write_error {
                 ui.colored_label(Color32::from_rgb(255, 0, 0), "Error writing configuration to file");
-            }
-        }
-    }
-
-    fn hwconfig_path(&mut self, ui: &mut Ui) {
-        if ui
-            .selectable_label(false, hwconfig::get_path().to_string_lossy())
-            .on_hover_text("Click to copy")
-            .clicked()
-        {
-            if let Ok(mut clip) = clipboard::ClipboardContext::new() {
-                let _ = clip.set_contents(hwconfig::get_path().to_string_lossy().to_string());
             }
         }
     }
@@ -188,8 +175,9 @@ impl GuiApp {
     }
 
     fn logging(&mut self, ui: &mut Ui) {
-        let mut sinks_to_remove: Vec<usize> = vec![];
-        let mut loggers_to_remove: Vec<usize> = vec![];
+        ui.heading("KsfLogger Configuration Path");
+        clickable_path(ui, logging::get_path());
+        ui.separator();
 
         ui.columns(2, |columns| {
             columns[0].heading("Sinks");
@@ -205,24 +193,36 @@ impl GuiApp {
             egui::ScrollArea::vertical()
                 .id_source("scroll_sinks")
                 .show(&mut columns[0], |ui| {
-                    sinks_to_remove = self.sinks(ui);
+                    let (sinks_to_remove, sinks_to_add_to_loggers) = self.sinks(ui);
+
+                    for index in sinks_to_remove {
+                        self.logger.config.sinks.remove(index);
+                    }
+
+                    for sink in sinks_to_add_to_loggers {
+                        for logger in self.logger.config.loggers.iter_mut() {
+                            logger.sinks.push(sink.clone());
+                        }
+                    }
                 });
 
             columns[1].heading("Loggers");
+            columns[1].horizontal(|ui| {
+                ui.label("Create new Logger:");
+                if ui.button(" + ").clicked() {
+                    self.logger.config.loggers.push(Logger::default());
+                }
+            });
+
             egui::ScrollArea::vertical()
                 .id_source("scroll_loggers")
                 .show(&mut columns[1], |ui| {
-                    loggers_to_remove = self.loggers(ui);
+                    let loggers_to_remove = self.loggers(ui);
+                    for index in loggers_to_remove {
+                        self.logger.config.loggers.remove(index);
+                    }
                 });
         });
-
-        for index in sinks_to_remove {
-            self.logger.config.sinks.remove(index);
-        }
-
-        for index in loggers_to_remove {
-            self.logger.config.loggers.remove(index);
-        }
     }
 
     fn loggers(&mut self, ui: &mut Ui) -> Vec<usize> {
@@ -233,7 +233,7 @@ impl GuiApp {
                 if ui.button(" - ").on_hover_text("Remove Logger").clicked() {
                     loggers_to_remove.push(i);
                 }
-                ui.text_edit_singleline(&mut logger.name);
+                ui.add(egui::TextEdit::singleline(&mut logger.name).hint_text("Pattern to match"));
             });
             level_dropdown(ui, &mut logger.level, format!("{} {}", &logger.name, i));
             sinks_checkboxes(ui, logger, &self.logger.config.sinks);
@@ -241,14 +241,19 @@ impl GuiApp {
         loggers_to_remove
     }
 
-    fn sinks(&mut self, ui: &mut Ui) -> Vec<usize> {
+    fn sinks(&mut self, ui: &mut Ui) -> (Vec<usize>, Vec<String>) {
         let mut sinks_to_remove = vec![];
+        let mut sinks_to_add_to_loggers = vec![];
+
         for (i, sink) in self.logger.config.sinks.iter_mut().enumerate() {
             ui.separator();
 
             ui.horizontal(|ui| {
-                if ui.button(" x ").on_hover_text("Remove Sink").clicked() {
+                if ui.button(" x ").on_hover_text("Remove").clicked() {
                     sinks_to_remove.push(i);
+                }
+                if ui.button(" ✅ ").on_hover_text("Enable on all loggers").clicked() {
+                    sinks_to_add_to_loggers.push(sink.get_name().clone());
                 }
                 ui.strong(sink.to_string());
             });
@@ -256,7 +261,7 @@ impl GuiApp {
             let (name, level) = sink.get_name_and_level_as_mut();
             ui.horizontal(|ui| {
                 ui.label("Name");
-                ui.text_edit_singleline(name);
+                ui.add(egui::TextEdit::singleline(name).hint_text("Unique name required"));
             });
 
             level_dropdown(ui, level, format!("{} {}", name, i));
@@ -299,7 +304,7 @@ impl GuiApp {
                 Sink::Console {
                     ref mut is_color, ..
                 } => {
-                    let mut color = is_true(is_color);
+                    let mut color = logging::is_true(is_color);
                     ui.checkbox(&mut color, "Color");
                     *is_color = Some(Bool::Boolean(color));
                 }
@@ -307,7 +312,7 @@ impl GuiApp {
                     ref mut activities_only,
                     ..
                 } => {
-                    let mut temp = is_true(activities_only);
+                    let mut temp = logging::is_true(activities_only);
                     ui.checkbox(&mut temp, "Activities Only");
                     *activities_only = Some(Bool::Boolean(temp));
                 }
@@ -321,7 +326,7 @@ impl GuiApp {
                 }
             }
         }
-        sinks_to_remove
+        (sinks_to_remove, sinks_to_add_to_loggers)
     }
 }
 
@@ -332,8 +337,20 @@ fn text_edit_labeled(ui: &mut Ui, label: &str, file_name: &mut String) {
     });
 }
 
+fn clickable_path(ui: &mut Ui, path: PathBuf) {
+    if ui
+        .selectable_label(false, &path.to_string_lossy())
+        .on_hover_text("Click to copy")
+        .clicked()
+    {
+        if let Ok(mut clip) = clipboard::ClipboardContext::new() {
+            let _ = clip.set_contents(path.to_string_lossy().to_string());
+        }
+    }
+}
+
 fn truncate_ui(ui: &mut Ui, truncate: &mut Option<Bool>) {
-    let mut trunc = is_true(truncate);
+    let mut trunc = logging::is_true(truncate);
     ui.checkbox(&mut trunc, "Truncate");
     *truncate = Some(Bool::Boolean(trunc));
 }
@@ -349,13 +366,17 @@ fn sinks_checkboxes(ui: &mut Ui, logger: &mut Logger, sinks: &Vec<Sink>) {
         if !checked && logger.sinks.contains(name) {
             logger.sinks.retain(|x| x != name);
         }
-
-        logger.sinks.retain(|logger_sink_name| {
-            sinks
-                .iter()
-                .any(|target_sink| target_sink.get_name() == logger_sink_name)
-        });
     }
+
+    remove_invalid_sinks(logger, sinks);
+}
+
+fn remove_invalid_sinks(logger: &mut Logger, sinks: &Vec<Sink>) {
+    logger.sinks.retain(|logger_sink_name| {
+        sinks
+            .iter()
+            .any(|target_sink| target_sink.get_name() == logger_sink_name)
+    });
 }
 
 fn level_dropdown(ui: &mut Ui, level: &mut Level, id: impl std::hash::Hash) {
@@ -370,6 +391,18 @@ fn level_dropdown(ui: &mut Ui, level: &mut Level, id: impl std::hash::Hash) {
 
 pub fn run() {
     let app = GuiApp::default();
-    let native_options = eframe::NativeOptions::default();
-    eframe::run_native(Box::new(app), native_options);
+
+    let icon = image::open("keysight-logo.ico").expect("Failed to open icon path").to_rgba8();
+    let (icon_width, icon_height) = icon.dimensions();
+
+    let options = eframe::NativeOptions {
+        icon_data: Some(eframe::epi::IconData {
+            rgba: icon.into_raw(),
+            width: icon_width,
+            height: icon_height,
+        }),
+        ..Default::default()
+    };
+
+    eframe::run_native(Box::new(app), options);
 }

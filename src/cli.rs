@@ -27,7 +27,6 @@ pub enum Command {
 
 #[derive(StructOpt, Debug)]
 pub enum LogCommand {
-    Set {},
     Show {},
     Path,
 }

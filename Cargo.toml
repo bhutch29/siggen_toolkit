@@ -1,8 +1,8 @@
 [package]
 name = "siggen_toolkit"
 version = "0.1.0"
-authors = ["Bradley Hutchinson <inukage0029@gmail.com>"]
-edition = "2018"
+authors = ["Bradley Hutchinson <brad.c.hutchinson@gmail.com>"]
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -16,3 +16,4 @@ strum = {version = "0.23", features = ["derive"]}
 serde = {version = "1.0", features=["derive"]}
 serde_json = "1.0"
 anyhow = "1.0"
+image = "0.23"

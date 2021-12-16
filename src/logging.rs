@@ -2,6 +2,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use strum::{Display, EnumIter};
+use std::path::PathBuf;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct LoggingConfiguration {
@@ -18,7 +19,7 @@ impl Default for LoggingConfiguration {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Logger {
     pub name: String,
     pub level: Level,
@@ -167,34 +168,16 @@ impl Default for Level {
     }
 }
 
-pub fn show() -> Result<()> {
-    let a = Logger {
-        name: "logger1".to_string(),
-        level: Level::Trace,
-        sinks: vec!["first".to_string(), "second".to_string()],
-    };
-    let b = Sink::Console {
-        level: Level::Warn,
-        name: "something".to_string(),
-        is_color: Some(Bool::Boolean(true)),
-    };
-    let d = Sink::RotatingFile {
-        level: Level::Debug,
-        name: "file".to_string(),
-        truncate: Some(Bool::Boolean(true)),
-        max_files: Some(2),
-        max_size: Some(1234),
-        file_name: "temp.txt".to_string(),
-    };
-    let c = LoggingConfiguration {
-        sinks: vec![b, d],
-        loggers: vec![a],
-    };
-    let j = serde_json::to_string_pretty(&c)?;
-    println!("{}", j);
+pub fn get_path() -> PathBuf {
+    PathBuf::from("/home/bhutch/projects/SigGenToolkit/temp.txt")
+}
 
-    let text = fs::read_to_string("../siggen/static/ksflogger.cfg")?;
-    let conf: LoggingConfiguration = serde_json::from_str(&text)?;
-    println!("{:?}", conf);
+pub fn get_current_config() -> LoggingConfiguration {
+    let contents = fs::read_to_string("./ksflogger.cfg").unwrap_or_default();
+    serde_json::from_str(&contents).unwrap_or_default()
+}
+
+pub fn show() -> Result<()> {
+    println!("{}", serde_json::to_string_pretty(&get_current_config())?);
     Ok(())
 }
