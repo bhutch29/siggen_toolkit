@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 use strum::{Display, EnumIter};
+use crate::common::*;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct LoggingConfiguration {
@@ -170,42 +171,41 @@ impl Default for Level {
 }
 
 pub fn get_path() -> PathBuf {
-    for path in paths_to_check() {
+    for path in valid_paths() {
         if path.exists() {
             return path;
         }
     }
-    PathBuf::from("ksflogger.cfg")
+    in_cwd(file_name())
 }
 
-fn paths_to_check() -> Vec<PathBuf> {
-    let mut os_dirs: Vec<PathBuf> = if cfg!(windows) {
+pub fn valid_paths() -> Vec<PathBuf> {
+    if cfg!(windows) {
         vec![dirs::document_dir(), Some(PathBuf::from("E:"))]
     } else {
         vec![dirs::home_dir()]
     }
     .into_iter()
     .filter_map(|x| x)
-    .map(|x| x.join("Keysight/PathWave/SignalGenerator/ksflogger.cfg"))
-    .collect();
-
-    if let Ok(p) = std::env::current_exe() {
-        os_dirs.push(p.with_file_name("ksflogger.cfg"))
-    };
-    os_dirs
+    .map(|x| x.join("Keysight/PathWave/SignalGenerator").join(file_name()))
+    .collect()
 }
 
-pub fn get_current_config() -> LoggingConfiguration {
-    let contents = fs::read_to_string(get_path()).unwrap_or_default();
+pub fn get_config_from(path: &PathBuf) -> LoggingConfiguration {
+    let contents = fs::read_to_string(path).unwrap_or_default();
     serde_json::from_str(&contents).unwrap_or_default()
 }
 
-pub fn set_config(config: LoggingConfiguration) -> Result<()> {
-    fs::write(get_path(), serde_json::to_string_pretty(&config)?)?;
+pub fn set_config(path: &PathBuf, config: LoggingConfiguration) -> Result<()> {
+    fs::write(path, serde_json::to_string_pretty(&config)?)?;
     Ok(())
 }
 
 pub fn show() -> Result<()> {
-    println!("{}", serde_json::to_string_pretty(&get_current_config())?);
+    println!("{}", serde_json::to_string_pretty(&get_config_from(&get_path()))?);
     Ok(())
+}
+
+pub fn file_name() -> String {
+    "ksflogger.cfg".to_string()
 }

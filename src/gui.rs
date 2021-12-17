@@ -1,6 +1,6 @@
 use crate::cli::SimulatedChannel;
 use crate::logging::{Bool, Level, Logger, LoggingConfiguration, Sink};
-use crate::{hwconfig, logging};
+use crate::{hwconfig, logging, common};
 use clipboard::ClipboardProvider;
 use eframe::epi::egui::Color32;
 pub use eframe::{egui, egui::CtxRef, egui::Ui, epi};
@@ -26,7 +26,9 @@ struct HwconfigState {
 
 struct LoggingState {
     config: LoggingConfiguration,
+    custom_path: String,
     write_error: bool,
+    remove_error: bool,
 }
 
 struct GuiApp {
@@ -46,7 +48,9 @@ impl Default for GuiApp {
             },
             logger: LoggingState {
                 config: Default::default(),
+                custom_path: String::new(),
                 write_error: false,
+                remove_error: false,
             },
             selected_tab: Tabs::Logging,
         }
@@ -87,7 +91,7 @@ impl epi::App for GuiApp {
         _storage: Option<&dyn epi::Storage>,
     ) {
         self.hwconfig.text = hwconfig::read();
-        self.logger.config = logging::get_current_config();
+        self.logger.config = logging::get_config_from(&logging::get_path());
     }
 
     fn name(&self) -> &str {
@@ -107,7 +111,7 @@ impl GuiApp {
 
     fn hwconfig(&mut self, ui: &mut Ui) {
         ui.heading("Hardware Configuration Path");
-        clickable_path(ui, hwconfig::get_path());
+        copyable_path(ui, &hwconfig::get_path());
         ui.separator();
 
         ui.heading("Simulated Hardware Configuration");
@@ -182,25 +186,24 @@ impl GuiApp {
     }
 
     fn logging(&mut self, ui: &mut Ui) {
-        ui.heading("KSF Logger Configuration Path");
-        clickable_path(ui, logging::get_path());
+        ui.heading("KSF Logger Configuration Paths");
+        ui.strong("Paths indexed by SigGen:");
+        for path in logging::valid_paths().iter() {
+            self.logging_path(ui, path);
+        }
+        ui.strong("Current working directory:");
+        self.logging_path(ui, &common::in_cwd(logging::file_name()));
+        ui.strong("Custom:");
         ui.horizontal(|ui| {
-            if ui.button("Write to file").clicked() {
-                self.logger.write_error = logging::set_config(self.logger.config.clone()).is_err();
-            }
-            if self.logger.write_error {
-                ui.colored_label(
-                    Color32::from_rgb(255, 0, 0),
-                    "Error writing configuration to file",
-                );
-            }
+            ui.text_edit_singleline(&mut self.logger.custom_path);
+            self.logging_path_buttons(ui, &PathBuf::from(&self.logger.custom_path));
         });
         ui.separator();
 
         ui.columns(2, |columns| {
             columns[0].heading("Sinks");
             columns[0].horizontal_wrapped(|ui| {
-                ui.label("Create New Sink:");
+                ui.label("Create new Sink:");
                 for sink in Sink::iter() {
                     if ui.button(sink.to_string()).clicked() {
                         self.logger.config.sinks.push(sink);
@@ -241,6 +244,39 @@ impl GuiApp {
                     }
                 });
         });
+    }
+
+    fn logging_path(&mut self, ui: &mut Ui, path: &PathBuf) {
+        ui.horizontal(|ui| {
+            copyable_path(ui, path);
+            self.logging_path_buttons(ui, path);
+        });
+    }
+
+    fn logging_path_buttons(&mut self, ui: &mut Ui, path: &PathBuf) {
+        if ui.add_enabled(path.exists() && path.is_file(), egui::Button::new("Load")).clicked() {
+            self.logger.config = logging::get_config_from(path);
+        }
+        if ui.button("Write").clicked() {
+            self.logger.remove_error = false;
+            self.logger.write_error = logging::set_config(path, self.logger.config.clone()).is_err();
+        }
+        if ui.add_enabled(path.exists() && path.is_file(), egui::Button::new("Remove")).clicked() {
+            self.logger.write_error = false;
+            self.logger.remove_error = fs::remove_file(path).is_err();
+        }
+        if self.logger.write_error {
+            ui.colored_label(
+                Color32::from_rgb(255, 0, 0),
+                "Error writing configuration to file",
+            );
+        }
+        if self.logger.remove_error {
+            ui.colored_label(
+                Color32::from_rgb(255, 0, 0),
+                "Error removing file",
+            );
+        }
     }
 
     fn loggers(&mut self, ui: &mut Ui) -> Vec<usize> {
@@ -359,7 +395,7 @@ fn text_edit_labeled(ui: &mut Ui, label: &str, file_name: &mut String) {
     });
 }
 
-fn clickable_path(ui: &mut Ui, path: PathBuf) {
+fn copyable_path(ui: &mut Ui, path: &PathBuf) {
     if ui
         .selectable_label(false, &path.to_string_lossy())
         .on_hover_text("Click to copy")

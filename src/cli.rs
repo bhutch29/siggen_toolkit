@@ -28,7 +28,7 @@ pub enum Command {
 #[derive(StructOpt, Debug)]
 pub enum LogCommand {
     Show {},
-    Path,
+    Paths,
 }
 
 #[derive(StructOpt, Debug)]
@@ -63,7 +63,7 @@ pub enum HwConfigCommand {
     },
     Restore,
     Show,
-    Path,
+    Paths,
 }
 
 #[derive(StructOpt, Debug, Clone, Copy, PartialEq, Display)]

@@ -2,14 +2,14 @@ mod cli;
 mod gui;
 mod hwconfig;
 mod logging;
+mod common;
 
 use anyhow::Result;
 use cli::*;
-use std::fs::File;
 
 fn main() -> Result<()> {
     let args: Sgt = Sgt::from_args();
-    dbg!(&args);
+    // dbg!(&args);
     if args.cmd.is_none() {
         gui::run();
     }
@@ -29,14 +29,20 @@ fn main() -> Result<()> {
                     println!("No hwconfig found")
                 }
             },
-            HwConfigCommand::Path => println!("{}", hwconfig::get_path().to_string_lossy()),
+            HwConfigCommand::Paths => {
+                for path in hwconfig::valid_paths() {
+                    println!("{} {}", path.display(), path.exists())
+                }
+            },
         },
         Command::Log(cmd) => match cmd {
             LogCommand::Show { .. } => {
                 logging::show()?;
             }
-            LogCommand::Path => {
-                println!("{}", logging::get_path().to_string_lossy())
+            LogCommand::Paths => {
+                for path in logging::valid_paths() {
+                    println!("{} {}", path.display(), path.exists())
+                }
             }
         },
         Command::SigGen(cmd) => match cmd {

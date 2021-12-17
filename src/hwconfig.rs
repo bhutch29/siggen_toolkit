@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 // use walkdir::WalkDir;
 use crate::cli;
 use std::borrow::Borrow;
+use crate::common::*;
 
 fn serialize_channel(channel: &cli::SimulatedChannel) -> String {
     match channel {
@@ -31,7 +32,25 @@ fn generate_hwconfig(config: cli::SimulatedChannel, channel_count: u8) -> String
 }
 
 pub fn get_path() -> PathBuf {
-    PathBuf::from("/home/bhutch/projects/siggen_toolkit/temp.txt")
+    for path in valid_paths() {
+        if path.exists() {
+            return path;
+        }
+    }
+    in_cwd(file_name())
+}
+
+pub fn valid_paths() -> Vec<PathBuf> {
+    // TODO: SigGen first checks the cwd
+    if cfg!(windows) {
+        vec![dirs::document_dir(), Some(PathBuf::from("E:"))]
+    } else {
+        vec![dirs::home_dir()]
+    }
+        .into_iter()
+        .filter_map(|x| x)
+        .map(|x| x.join("Keysight/PathWave/SignalGenerator").join(file_name()))
+        .collect()
 }
 
 pub fn set(config: cli::SimulatedChannel, channel_count: u8) {
@@ -72,4 +91,8 @@ pub fn set(config: cli::SimulatedChannel, channel_count: u8) {
 
 pub fn read() -> Option<String> {
     try_read_file(get_path().borrow())
+}
+
+pub fn file_name() -> String {
+    "sghal_dev.cfg".to_string()
 }
