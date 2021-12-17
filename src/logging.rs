@@ -1,10 +1,10 @@
+use crate::common::*;
 use anyhow::Result;
 use dirs;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 use strum::{Display, EnumIter};
-use crate::common::*;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct LoggingConfiguration {
@@ -187,7 +187,10 @@ pub fn valid_paths() -> Vec<PathBuf> {
     }
     .into_iter()
     .filter_map(|x| x)
-    .map(|x| x.join("Keysight/PathWave/SignalGenerator").join(file_name()))
+    .map(|x| {
+        x.join("Keysight/PathWave/SignalGenerator")
+            .join(file_name())
+    })
     .collect()
 }
 
@@ -202,7 +205,10 @@ pub fn set_config(path: &PathBuf, config: LoggingConfiguration) -> Result<()> {
 }
 
 pub fn show() -> Result<()> {
-    println!("{}", serde_json::to_string_pretty(&get_config_from(&get_path()))?);
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&get_config_from(&get_path()))?
+    );
     Ok(())
 }
 

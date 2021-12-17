@@ -1,9 +1,8 @@
-use std::fs;
-use std::path::{Path, PathBuf};
-// use walkdir::WalkDir;
 use crate::cli;
-use std::borrow::Borrow;
 use crate::common::*;
+use anyhow::Result;
+use std::fs;
+use std::path::PathBuf;
 
 fn serialize_channel(channel: &cli::SimulatedChannel) -> String {
     match channel {
@@ -21,13 +20,7 @@ fn serialize_channels(channels: &[cli::SimulatedChannel]) -> String {
         .collect()
 }
 
-fn try_read_file(path: &Path) -> Option<String> {
-    path.exists()
-        .then(|| fs::read_to_string(path).ok())
-        .flatten()
-}
-
-fn generate_hwconfig(config: cli::SimulatedChannel, channel_count: u8) -> String {
+pub fn serialize_hwconfig(config: cli::SimulatedChannel, channel_count: u8) -> String {
     serialize_channels(vec![config; channel_count as usize].as_slice())
 }
 
@@ -47,41 +40,20 @@ pub fn valid_paths() -> Vec<PathBuf> {
     } else {
         vec![dirs::home_dir()]
     }
-        .into_iter()
-        .filter_map(|x| x)
-        .map(|x| x.join("Keysight/PathWave/SignalGenerator").join(file_name()))
-        .collect()
+    .into_iter()
+    .filter_map(|x| x)
+    .map(|x| {
+        x.join("Keysight/PathWave/SignalGenerator")
+            .join(file_name())
+    })
+    .collect()
 }
 
-pub fn set(config: cli::SimulatedChannel, channel_count: u8) {
-    let text = generate_hwconfig(config, channel_count);
-
-    let contents = try_read_file(get_path().borrow());
-    if let Some(text) = &contents {
-        println!("Contents before overwriting:");
-        println!("{}", text);
-    };
-
-    let write_file = || {
-        if fs::create_dir_all(get_path().parent().unwrap()).is_ok() {
-            fs::write(get_path(), &text).expect("Unable to write to temp.txt");
-        }
-    };
-
-    match contents {
-        None => {
-            println!("Creating temp.txt");
-            write_file();
-        }
-        Some(before) => {
-            if before != text {
-                println!("Overwriting temp.txt...");
-                write_file();
-            } else {
-                println!("File already contains desired content");
-            }
-        }
+pub fn set(path: &PathBuf, config: cli::SimulatedChannel, channel_count: u8) -> Result<()> {
+    if fs::create_dir_all(path.parent().unwrap()).is_ok() {
+        fs::write(path, &serialize_hwconfig(config, channel_count))?;
     }
+    Ok(())
 }
 
 // for entry in WalkDir::new("/home/bhutch/projects/siggen_toolkit") {
@@ -89,8 +61,10 @@ pub fn set(config: cli::SimulatedChannel, channel_count: u8) {
 //     println!("{}", entry.path().display());
 // }
 
-pub fn read() -> Option<String> {
-    try_read_file(get_path().borrow())
+pub fn read_from(path: &PathBuf) -> Option<String> {
+    path.exists()
+        .then(|| fs::read_to_string(path).ok())
+        .flatten()
 }
 
 pub fn file_name() -> String {

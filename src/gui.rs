@@ -1,9 +1,9 @@
 use crate::cli::SimulatedChannel;
 use crate::logging::{Bool, Level, Logger, LoggingConfiguration, Sink};
-use crate::{hwconfig, logging, common};
+use crate::{common, hwconfig, logging};
 use clipboard::ClipboardProvider;
 use eframe::epi::egui::Color32;
-pub use eframe::{egui, egui::CtxRef, egui::Ui, epi};
+pub use eframe::{egui, egui::Button, egui::CtxRef, egui::Ui, epi};
 use image;
 use std::fs;
 use std::path::PathBuf;
@@ -20,13 +20,14 @@ enum Tabs {
 struct HwconfigState {
     channel_count: u8,
     platform: SimulatedChannel,
-    text: Option<String>,
     write_error: bool,
+    remove_error: bool,
 }
 
 struct LoggingState {
     config: LoggingConfiguration,
     custom_path: String,
+    loaded_from: Option<PathBuf>,
     write_error: bool,
     remove_error: bool,
 }
@@ -43,12 +44,13 @@ impl Default for GuiApp {
             hwconfig: HwconfigState {
                 channel_count: 1,
                 platform: SimulatedChannel::MCS31 { signal_count: 1 },
-                text: None,
                 write_error: false,
+                remove_error: false,
             },
             logger: LoggingState {
                 config: Default::default(),
-                custom_path: String::new(),
+                loaded_from: None,
+                custom_path: String::default(),
                 write_error: false,
                 remove_error: false,
             },
@@ -90,8 +92,8 @@ impl epi::App for GuiApp {
         _frame: &mut epi::Frame<'_>,
         _storage: Option<&dyn epi::Storage>,
     ) {
-        self.hwconfig.text = hwconfig::read();
         self.logger.config = logging::get_config_from(&logging::get_path());
+        self.logger.loaded_from = Some(logging::get_path());
     }
 
     fn name(&self) -> &str {
@@ -110,9 +112,13 @@ impl GuiApp {
     }
 
     fn hwconfig(&mut self, ui: &mut Ui) {
-        ui.heading("Hardware Configuration Path");
-        copyable_path(ui, &hwconfig::get_path());
-        ui.separator();
+        ui.heading("Hardware Configuration");
+        ui.strong("Paths indexed by SigGen:");
+        for path in hwconfig::valid_paths().iter() {
+            self.hwconfig_path(ui, path);
+        }
+        ui.strong("Current working directory:");
+        self.hwconfig_path(ui, &common::in_cwd(hwconfig::file_name()));
 
         ui.heading("Simulated Hardware Configuration");
         self.platform_dropdown(ui);
@@ -120,26 +126,41 @@ impl GuiApp {
         if let SimulatedChannel::MCS31 { .. } = self.hwconfig.platform {
             self.signal_count_selector(ui);
         }
-        if ui.button("Apply Simulated Config").clicked() {
-            hwconfig::set(self.hwconfig.platform, self.hwconfig.channel_count);
-            self.hwconfig.text = hwconfig::read();
-            self.hwconfig.write_error = false; // cleanup any old errors
+        ui.add_enabled(
+            false,
+            egui::TextEdit::multiline(&mut hwconfig::serialize_hwconfig(
+                self.hwconfig.platform,
+                self.hwconfig.channel_count,
+            )),
+        );
+    }
+
+    fn hwconfig_path(&mut self, ui: &mut Ui, path: &PathBuf) {
+        ui.horizontal(|ui| {
+            copyable_path(ui, path);
+            self.hwconfig_path_buttons(ui, path);
+        });
+    }
+
+    fn hwconfig_path_buttons(&mut self, ui: &mut Ui, path: &PathBuf) {
+        if ui.button("Save").clicked() {
+            self.hwconfig.write_error =
+                hwconfig::set(path, self.hwconfig.platform, self.hwconfig.channel_count).is_err();
+            self.hwconfig.remove_error = false;
+        }
+        if ui
+            .add_enabled(path.exists() && path.is_file(), Button::new("Delete"))
+            .clicked()
+        {
+            self.hwconfig.write_error = false;
+            self.hwconfig.remove_error = fs::remove_file(path).is_err();
         }
 
-        if let Some(ref mut text) = self.hwconfig.text {
-            ui.separator();
-            ui.heading("Current Hardware Configuration");
-            ui.text_edit_multiline(text);
-            if ui.button("Write Configuration").clicked() {
-                self.hwconfig.write_error = fs::write(hwconfig::get_path(), text).is_err();
-            }
-
-            if self.hwconfig.write_error {
-                ui.colored_label(
-                    Color32::from_rgb(255, 0, 0),
-                    "Error writing configuration to file",
-                );
-            }
+        if self.hwconfig.write_error {
+            error_label(ui, "Error writing configuration to file")
+        }
+        if self.hwconfig.remove_error {
+            error_label(ui, "Error removing file")
         }
     }
 
@@ -186,7 +207,7 @@ impl GuiApp {
     }
 
     fn logging(&mut self, ui: &mut Ui) {
-        ui.heading("KSF Logger Configuration Paths");
+        ui.heading("KSF Logger Configuration");
         ui.strong("Paths indexed by SigGen:");
         for path in logging::valid_paths().iter() {
             self.logging_path(ui, path);
@@ -254,28 +275,38 @@ impl GuiApp {
     }
 
     fn logging_path_buttons(&mut self, ui: &mut Ui, path: &PathBuf) {
-        if ui.add_enabled(path.exists() && path.is_file(), egui::Button::new("Load")).clicked() {
+        ui.label(if Some(path) == self.logger.loaded_from.as_ref() {
+            "⬅"
+        } else {
+            "     "
+        });
+
+        let exists = path.exists() && path.is_file();
+        if ui.add_enabled(exists, Button::new("Load")).clicked() {
             self.logger.config = logging::get_config_from(path);
+            self.logger.loaded_from = Some(path.clone());
         }
-        if ui.button("Write").clicked() {
+        if ui.button("Save").clicked() {
             self.logger.remove_error = false;
-            self.logger.write_error = logging::set_config(path, self.logger.config.clone()).is_err();
+            self.logger.write_error =
+                logging::set_config(path, self.logger.config.clone()).is_err();
+            if !self.logger.write_error {
+                self.logger.loaded_from = Some(path.clone());
+            }
         }
-        if ui.add_enabled(path.exists() && path.is_file(), egui::Button::new("Remove")).clicked() {
+        if ui.add_enabled(exists, Button::new("Delete")).clicked() {
             self.logger.write_error = false;
             self.logger.remove_error = fs::remove_file(path).is_err();
+            if Some(path) == self.logger.loaded_from.as_ref() {
+                self.logger.loaded_from = None;
+            }
         }
+
         if self.logger.write_error {
-            ui.colored_label(
-                Color32::from_rgb(255, 0, 0),
-                "Error writing configuration to file",
-            );
+            error_label(ui, "Error writing configuration to file");
         }
         if self.logger.remove_error {
-            ui.colored_label(
-                Color32::from_rgb(255, 0, 0),
-                "Error removing file",
-            );
+            error_label(ui, "Error removing file");
         }
     }
 
@@ -393,6 +424,10 @@ fn text_edit_labeled(ui: &mut Ui, label: &str, file_name: &mut String) {
         ui.label(label);
         ui.text_edit_singleline(file_name);
     });
+}
+
+fn error_label(ui: &mut Ui, label: &str) {
+    ui.colored_label(Color32::from_rgb(255, 0, 0), label);
 }
 
 fn copyable_path(ui: &mut Ui, path: &PathBuf) {

@@ -1,8 +1,8 @@
 mod cli;
+mod common;
 mod gui;
 mod hwconfig;
 mod logging;
-mod common;
 
 use anyhow::Result;
 use cli::*;
@@ -19,9 +19,9 @@ fn main() -> Result<()> {
             HwConfigCommand::Set {
                 config,
                 channel_count,
-            } => hwconfig::set(config, channel_count),
+            } => hwconfig::set(&hwconfig::get_path(), config, channel_count)?,
             HwConfigCommand::Restore => println!("Not yet implemented!"),
-            HwConfigCommand::Show => match hwconfig::read() {
+            HwConfigCommand::Show => match hwconfig::read_from(&hwconfig::get_path()) {
                 Some(text) => {
                     println!("{}", text)
                 }
@@ -33,7 +33,7 @@ fn main() -> Result<()> {
                 for path in hwconfig::valid_paths() {
                     println!("{} {}", path.display(), path.exists())
                 }
-            },
+            }
         },
         Command::Log(cmd) => match cmd {
             LogCommand::Show { .. } => {
