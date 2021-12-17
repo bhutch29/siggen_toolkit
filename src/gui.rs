@@ -1,19 +1,20 @@
 use crate::cli::SimulatedChannel;
-use crate::{hwconfig, logging};
 use crate::logging::{Bool, Level, Logger, LoggingConfiguration, Sink};
-pub use eframe::{egui, egui::CtxRef, egui::Ui, epi};
-use std::fs;
-use image;
+use crate::{hwconfig, logging};
 use clipboard::ClipboardProvider;
-use strum::{Display, EnumIter, IntoEnumIterator};
 use eframe::epi::egui::Color32;
+pub use eframe::{egui, egui::CtxRef, egui::Ui, epi};
+use image;
+use std::fs;
 use std::path::PathBuf;
+use strum::{Display, EnumIter, IntoEnumIterator};
 
 #[derive(PartialEq, EnumIter, Display)]
 enum Tabs {
+    Logging,
     #[strum(serialize = "Hardware Configuration")]
     HwConfig,
-    Logging,
+    Versions,
 }
 
 struct HwconfigState {
@@ -25,6 +26,7 @@ struct HwconfigState {
 
 struct LoggingState {
     config: LoggingConfiguration,
+    write_error: bool,
 }
 
 struct GuiApp {
@@ -44,8 +46,9 @@ impl Default for GuiApp {
             },
             logger: LoggingState {
                 config: Default::default(),
+                write_error: false,
             },
-            selected_tab: Tabs::HwConfig,
+            selected_tab: Tabs::Logging,
         }
     }
 }
@@ -73,6 +76,7 @@ impl epi::App for GuiApp {
             Tabs::Logging => {
                 self.logging(ui);
             }
+            Tabs::Versions => {}
         });
     }
 
@@ -127,7 +131,10 @@ impl GuiApp {
             }
 
             if self.hwconfig.write_error {
-                ui.colored_label(Color32::from_rgb(255, 0, 0), "Error writing configuration to file");
+                ui.colored_label(
+                    Color32::from_rgb(255, 0, 0),
+                    "Error writing configuration to file",
+                );
             }
         }
     }
@@ -175,8 +182,19 @@ impl GuiApp {
     }
 
     fn logging(&mut self, ui: &mut Ui) {
-        ui.heading("KsfLogger Configuration Path");
+        ui.heading("KSF Logger Configuration Path");
         clickable_path(ui, logging::get_path());
+        ui.horizontal(|ui| {
+            if ui.button("Write to file").clicked() {
+                self.logger.write_error = logging::set_config(self.logger.config.clone()).is_err();
+            }
+            if self.logger.write_error {
+                ui.colored_label(
+                    Color32::from_rgb(255, 0, 0),
+                    "Error writing configuration to file",
+                );
+            }
+        });
         ui.separator();
 
         ui.columns(2, |columns| {
@@ -230,7 +248,7 @@ impl GuiApp {
         for (i, logger) in self.logger.config.loggers.iter_mut().enumerate() {
             ui.separator();
             ui.horizontal(|ui| {
-                if ui.button(" - ").on_hover_text("Remove Logger").clicked() {
+                if ui.button(" x ").on_hover_text("Remove").clicked() {
                     loggers_to_remove.push(i);
                 }
                 ui.add(egui::TextEdit::singleline(&mut logger.name).hint_text("Pattern to match"));
@@ -252,7 +270,11 @@ impl GuiApp {
                 if ui.button(" x ").on_hover_text("Remove").clicked() {
                     sinks_to_remove.push(i);
                 }
-                if ui.button(" ✅ ").on_hover_text("Enable on all loggers").clicked() {
+                if ui
+                    .button(" ✅ ")
+                    .on_hover_text("Enable on all loggers")
+                    .clicked()
+                {
                     sinks_to_add_to_loggers.push(sink.get_name().clone());
                 }
                 ui.strong(sink.to_string());
@@ -392,7 +414,9 @@ fn level_dropdown(ui: &mut Ui, level: &mut Level, id: impl std::hash::Hash) {
 pub fn run() {
     let app = GuiApp::default();
 
-    let icon = image::open("keysight-logo.ico").expect("Failed to open icon path").to_rgba8();
+    let icon = image::open("keysight-logo.ico")
+        .expect("Failed to open icon path")
+        .to_rgba8();
     let (icon_width, icon_height) = icon.dimensions();
 
     let options = eframe::NativeOptions {

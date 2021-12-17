@@ -35,15 +35,24 @@ fn main() -> Result<()> {
             LogCommand::Show { .. } => {
                 logging::show()?;
             }
-            LogCommand::Path => {println!("{}", logging::get_path().to_string_lossy())}
+            LogCommand::Path => {
+                println!("{}", logging::get_path().to_string_lossy())
+            }
         },
         Command::SigGen(cmd) => match cmd {
             SigGenCommand::Download { version: _ } => {
                 // TODO
-                let response = reqwest::blocking::get("https://artifactory.it.keysight.com/artifactory/generic-local-pwsg/siggen/packages-linux/develop/siggen_1-9-1-9_2021-11-22_linux.zip")?;
-                let bytes = response.bytes()?;
-                let mut out = File::create("/home/bhutch/projects/SigGenToolkit/temp.zip")?;
-                std::io::copy(&mut bytes.as_ref(), &mut out)?;
+                // let response = reqwest::blocking::get("https://artifactory.it.keysight.com/artifactory/generic-local-pwsg/siggen/packages-linux/develop/siggen_1-9-1-9_2021-11-22_linux.zip")?;
+                // let response = reqwest::blocking::get("https://artifactory.it.keysight.com/artifactory/generic-local-pwsg/siggen/packages-linux/develop/")?;
+                let generic_local_pwsg = "https://artifactory.it.keysight.com/artifactory/api/storage/generic-local-pwsg/siggen";
+                let response = reqwest::blocking::get(format!(
+                    "{}/packages-linux/develop",
+                    generic_local_pwsg
+                ))?;
+                println!("{}", response.text()?);
+                // let bytes = response.bytes()?;
+                // let mut out = File::create("/home/bhutch/projects/siggen_toolkit/temp.zip")?;
+                // std::io::copy(&mut bytes.as_ref(), &mut out)?;
             }
             SigGenCommand::List => {}
             SigGenCommand::Run { .. } => {}

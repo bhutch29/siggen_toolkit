@@ -21,7 +21,9 @@ fn serialize_channels(channels: &[cli::SimulatedChannel]) -> String {
 }
 
 fn try_read_file(path: &Path) -> Option<String> {
-    path.exists().then(|| fs::read_to_string(path).ok()).flatten()
+    path.exists()
+        .then(|| fs::read_to_string(path).ok())
+        .flatten()
 }
 
 fn generate_hwconfig(config: cli::SimulatedChannel, channel_count: u8) -> String {
@@ -29,7 +31,7 @@ fn generate_hwconfig(config: cli::SimulatedChannel, channel_count: u8) -> String
 }
 
 pub fn get_path() -> PathBuf {
-    PathBuf::from("/home/bhutch/projects/SigGenToolkit/temp.txt")
+    PathBuf::from("/home/bhutch/projects/siggen_toolkit/temp.txt")
 }
 
 pub fn set(config: cli::SimulatedChannel, channel_count: u8) {
@@ -63,7 +65,7 @@ pub fn set(config: cli::SimulatedChannel, channel_count: u8) {
     }
 }
 
-// for entry in WalkDir::new("/home/bhutch/projects/SigGenToolkit") {
+// for entry in WalkDir::new("/home/bhutch/projects/siggen_toolkit") {
 //     let entry = entry.unwrap();
 //     println!("{}", entry.path().display());
 // }
