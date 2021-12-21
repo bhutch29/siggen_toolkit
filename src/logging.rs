@@ -6,19 +6,10 @@ use std::fs;
 use std::path::PathBuf;
 use strum::{Display, EnumIter};
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct LoggingConfiguration {
     pub sinks: Vec<Sink>,
     pub loggers: Vec<Logger>,
-}
-
-impl Default for LoggingConfiguration {
-    fn default() -> Self {
-        Self {
-            sinks: vec![],
-            loggers: vec![],
-        }
-    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]

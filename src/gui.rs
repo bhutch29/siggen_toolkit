@@ -1,10 +1,13 @@
 use crate::cli::SimulatedChannel;
 use crate::logging::{Bool, Level, Logger, LoggingConfiguration, Sink};
-use crate::{common, hwconfig, logging};
+use crate::{common, hwconfig, logging, versions};
 use clipboard::ClipboardProvider;
 use eframe::epi::egui::Color32;
 pub use eframe::{egui, egui::Button, egui::CtxRef, egui::Ui, epi};
-use image;
+// use image;
+use crate::versions::{parse_semver, Child};
+use std::cmp::Ordering;
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
 use strum::{Display, EnumIter, IntoEnumIterator};
@@ -32,10 +35,22 @@ struct LoggingState {
     remove_error: bool,
 }
 
+#[derive(Default)]
+struct VersionsState {
+    develop_children: Vec<Child>,
+    major_filter_options: BTreeSet<u16>,
+    major_filter: Option<u16>,
+    minor_filter_options: BTreeSet<u16>,
+    minor_filter: Option<u16>,
+    patch_filter_options: BTreeSet<u16>,
+    patch_filter: Option<u16>,
+}
+
 struct GuiApp {
     selected_tab: Tabs,
     hwconfig: HwconfigState,
     logger: LoggingState,
+    versions: VersionsState,
 }
 
 impl Default for GuiApp {
@@ -54,6 +69,7 @@ impl Default for GuiApp {
                 write_error: false,
                 remove_error: false,
             },
+            versions: VersionsState::default(),
             selected_tab: Tabs::Logging,
         }
     }
@@ -82,7 +98,9 @@ impl epi::App for GuiApp {
             Tabs::Logging => {
                 self.logging(ui);
             }
-            Tabs::Versions => {}
+            Tabs::Versions => {
+                self.versions(ui);
+            }
         });
     }
 
@@ -94,6 +112,8 @@ impl epi::App for GuiApp {
     ) {
         self.logger.config = logging::get_config_from(&logging::get_path());
         self.logger.loaded_from = Some(logging::get_path());
+        self.versions.develop_children = versions::get().children;
+        self.sort_children();
     }
 
     fn name(&self) -> &str {
@@ -204,6 +224,99 @@ impl GuiApp {
                     "MCS1.5",
                 );
             });
+    }
+
+    fn versions(&mut self, ui: &mut Ui) {
+        ui.heading("Versions");
+
+        if ui.button("Refresh").clicked() {
+            self.versions.develop_children = versions::get().children;
+            self.sort_children();
+        }
+
+        ui.horizontal(|ui| {
+            filter_dropdown(
+                ui,
+                "Major",
+                &mut self.versions.major_filter,
+                &self.versions.major_filter_options,
+            );
+            filter_dropdown(
+                ui,
+                "Minor",
+                &mut self.versions.minor_filter,
+                &self.versions.minor_filter_options,
+            );
+            filter_dropdown(
+                ui,
+                "Patch",
+                &mut self.versions.patch_filter,
+                &self.versions.patch_filter_options,
+            );
+        });
+
+        egui::ScrollArea::vertical()
+            .id_source("versions_scroll")
+            .show(ui, |ui| {
+                for child in &self.versions.develop_children {
+                    if let Some((version, date)) = get_version_and_date_from_uri(&child.uri) {
+                        if let Some(v) = parse_semver(version) {
+                            if let Some(filter) = self.versions.major_filter {
+                                if v.major != filter {
+                                    continue;
+                                }
+                            }
+                            if let Some(filter) = self.versions.minor_filter {
+                                if v.minor != filter {
+                                    continue;
+                                }
+                            }
+                            if let Some(filter) = self.versions.patch_filter {
+                                if v.patch != filter {
+                                    continue;
+                                }
+                            }
+                        }
+                        ui.horizontal(|ui| {
+                            ui.label(format!("{} ({})", version, date));
+                            ui.horizontal(|ui| {
+                                if ui.button(" ⬇ Download ").clicked() {
+                                    // TODO: download &child.uri
+                                }
+                            });
+                        });
+                    }
+                }
+            });
+    }
+
+    fn sort_children(&mut self) {
+        self.versions.develop_children.sort_by(|a, b| {
+            let parsed_a = get_version_and_date_from_uri(&a.uri)
+                .and_then(|version_date| versions::parse_semver(version_date.0));
+            let parsed_b = get_version_and_date_from_uri(&b.uri)
+                .and_then(|version_date| versions::parse_semver(version_date.0));
+
+            if parsed_a.is_some() && parsed_b.is_some() {
+                return parsed_a.unwrap().partial_cmp(&parsed_b.unwrap()).unwrap();
+            }
+
+            if parsed_a.is_none() {
+                Ordering::Greater
+            } else {
+                Ordering::Less
+            }
+        });
+
+        for child in &self.versions.develop_children {
+            let semver = get_version_and_date_from_uri(&child.uri)
+                .and_then(|version_date| parse_semver(version_date.0));
+            if let Some(v) = semver {
+                self.versions.major_filter_options.insert(v.major);
+                self.versions.minor_filter_options.insert(v.minor);
+                self.versions.patch_filter_options.insert(v.patch);
+            }
+        }
     }
 
     fn logging(&mut self, ui: &mut Ui) {
@@ -485,19 +598,59 @@ fn level_dropdown(ui: &mut Ui, level: &mut Level, id: impl std::hash::Hash) {
 pub fn run() {
     let app = GuiApp::default();
 
-    let icon = image::open("keysight-logo.ico")
-        .expect("Failed to open icon path")
-        .to_rgba8();
-    let (icon_width, icon_height) = icon.dimensions();
-
-    let options = eframe::NativeOptions {
-        icon_data: Some(eframe::epi::IconData {
-            rgba: icon.into_raw(),
-            width: icon_width,
-            height: icon_height,
-        }),
-        ..Default::default()
-    };
+    // let icon = image::open("keysight-logo.ico")
+    //     .expect("Failed to open icon path")
+    //     .to_rgba8();
+    // let (icon_width, icon_height) = icon.dimensions();
+    //
+    // let options = eframe::NativeOptions {
+    //     icon_data: Some(eframe::epi::IconData {
+    //         rgba: icon.into_raw(),
+    //         width: icon_width,
+    //         height: icon_height,
+    //     }),
+    //     ..Default::default()
+    // };
+    let options = eframe::NativeOptions::default();
 
     eframe::run_native(Box::new(app), options);
+}
+
+fn get_version_and_date_from_uri(uri: &String) -> Option<(&str, &str)> {
+    let formatted = uri
+        .trim_start_matches("/")
+        .trim_start_matches("siggen_")
+        .trim_end_matches(".zip")
+        .trim_end_matches("_linux");
+
+    let split: Vec<&str> = formatted.split("_").take(2).collect();
+    match split[..] {
+        [version, date] => Some((version, date)),
+        _ => None,
+    }
+}
+
+fn filter_dropdown(
+    ui: &mut Ui,
+    label: &str,
+    filter_val: &mut Option<u16>,
+    filter_options: &BTreeSet<u16>,
+) {
+    ui.add_enabled_ui(filter_options.len() > 1, |ui| {
+        egui::ComboBox::from_label(label)
+            .selected_text(format!(
+                "{}",
+                if filter_val.is_none() {
+                    "*".to_string()
+                } else {
+                    filter_val.unwrap().to_string()
+                }
+            ))
+            .show_ui(ui, |ui| {
+                ui.selectable_value(filter_val, None, "*");
+                for option in filter_options {
+                    ui.selectable_value(filter_val, Some(*option), option.to_string());
+                }
+            })
+    });
 }
