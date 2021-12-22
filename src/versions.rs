@@ -1,8 +1,24 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
+use std::collections::BTreeSet;
 use std::fs::File;
 use std::time::Duration;
+
+pub struct VersionsClient {
+    client: reqwest::blocking::Client,
+}
+
+impl Default for VersionsClient {
+    fn default() -> Self {
+        Self {
+            client: reqwest::blocking::Client::builder()
+                .timeout(Duration::from_secs(1000))
+                .build()
+                .expect("Unabled to create web client"),
+        }
+    }
+}
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -154,50 +170,66 @@ mod tests {
     }
 }
 
-pub fn do_stuff() -> Result<()> {
-    let generic_local_pwsg =
-        "https://artifactory.it.keysight.com/artifactory/api/storage/generic-local-pwsg/siggen";
-    let response =
-        reqwest::blocking::get(format!("{}/packages-linux/develop", generic_local_pwsg))?;
-    let temp: ArtifactoryDirectory = serde_json::from_str(&response.text()?)?;
-    dbg!(&temp);
+impl VersionsClient {
+    pub fn do_stuff(&self) -> Result<()> {
+        let generic_local_pwsg =
+            "https://artifactory.it.keysight.com/artifactory/api/storage/generic-local-pwsg/siggen";
+        let response = self
+            .client
+            .get(format!("{}/packages-linux/develop", generic_local_pwsg))
+            .send()?;
+        let temp: ArtifactoryDirectory = serde_json::from_str(&response.text()?)?;
+        dbg!(&temp);
 
-    for child in temp.children {
-        println!("{}", child.uri);
+        for child in temp.children {
+            println!("{}", child.uri);
+        }
+
+        Ok(())
     }
 
-    Ok(())
-}
+    pub fn download(&self, url: String, file_name: &str) -> Result<()> {
+        let destination_dir = dirs::download_dir().unwrap_or(dirs::home_dir().ok_or(
+            anyhow::Error::msg("Could not find Downloads or Home directories"),
+        )?);
+        let mut out = File::create(format!("{}/{}", destination_dir.display(), file_name))?;
 
-pub fn download(url: String, file_name: &str) -> Result<()> {
-    let destination_dir = dirs::download_dir().unwrap_or(dirs::home_dir().ok_or(
-        anyhow::Error::msg("Could not find Downloads or Home directories"),
-    )?);
-    let mut out = File::create(format!("{}/{}", destination_dir.display(), file_name))?;
+        self.client.get(url).send()?.copy_to(&mut out)?;
+        Ok(())
+    }
 
-    // TODO: save client for app lifetime
-    reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(1000))
-        .build()?
-        .get(url)
-        .send()?
-        .copy_to(&mut out)?;
-    // let bytes = response.bytes()?;
-    // std::io::copy(&mut bytes.as_ref(), &mut out)?;
-    Ok(())
-}
+    pub fn get_packages_info(&self, branch: &String) -> ArtifactoryDirectory {
+        let request = self.client.get(format!(
+            "{}/{}/{}",
+            BASE_API_URL,
+            package_segments(),
+            branch
+        ));
 
-pub fn get_packages_info(branch: String) -> ArtifactoryDirectory {
-    match reqwest::blocking::get(format!(
-        "{}/{}/{}",
-        BASE_API_URL,
-        package_segments(),
-        branch
-    )) {
-        Ok(response) => {
-            serde_json::from_str(&response.text().unwrap_or_default()).unwrap_or_default()
+        match request.send() {
+            Ok(response) => {
+                serde_json::from_str(&response.text().unwrap_or_default()).unwrap_or_default()
+            }
+            Err(_) => ArtifactoryDirectory::default(),
         }
-        _ => ArtifactoryDirectory::default(),
+    }
+
+    pub fn get_branch_names(&self) -> BTreeSet<String> {
+        let request = self
+            .client
+            .get(format!("{}/{}", BASE_API_URL, package_segments()));
+        let mut result = BTreeSet::new();
+        match request.send() {
+            Ok(response) => {
+                let response: ArtifactoryDirectory =
+                    serde_json::from_str(&response.text().unwrap_or_default()).unwrap_or_default();
+                for child in response.children {
+                    result.insert(child.uri.trim_start_matches("/").to_string());
+                }
+            }
+            Err(_) => {}
+        };
+        result
     }
 }
 

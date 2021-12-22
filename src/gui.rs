@@ -1,7 +1,8 @@
 use crate::cli::SimulatedChannel;
 use crate::logging::{Bool, Level, Logger, LoggingConfiguration, Sink};
 use crate::versions::{
-    develop_branch, package_segments, parse_semver, ArtifactoryDirectoryChild, BASE_DOWNLOAD_URL,
+    develop_branch, package_segments, parse_semver, ArtifactoryDirectoryChild, VersionsClient,
+    BASE_DOWNLOAD_URL,
 };
 use crate::{common, hwconfig, logging, versions};
 use clipboard::ClipboardProvider;
@@ -12,7 +13,6 @@ use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::path::PathBuf;
 use strum::{Display, EnumIter, IntoEnumIterator};
-use image::ImageFormat;
 
 #[derive(PartialEq, EnumIter, Display)]
 enum Tabs {
@@ -37,15 +37,37 @@ struct LoggingState {
     remove_error: bool,
 }
 
-#[derive(Default)]
-struct VersionsState {
-    cache: HashMap<String, Vec<ArtifactoryDirectoryChild>>,
+#[derive(Default, Clone)]
+struct VersionsFilter {
     major_filter_options: BTreeSet<u16>,
     major_filter: Option<u16>,
     minor_filter_options: BTreeSet<u16>,
     minor_filter: Option<u16>,
     patch_filter_options: BTreeSet<u16>,
     patch_filter: Option<u16>,
+}
+
+#[derive(Default)]
+struct VersionsState {
+    client: VersionsClient,
+    cache: HashMap<String, Vec<ArtifactoryDirectoryChild>>,
+    branch_names: BTreeSet<String>,
+    selected_branch: String,
+    filters: HashMap<String, VersionsFilter>,
+}
+
+impl VersionsState {
+    pub fn get_current_filter(&self) -> Option<&VersionsFilter> {
+        self.filters.get(&self.selected_branch)
+    }
+
+    pub fn get_current_filter_mut(&mut self) -> Option<&mut VersionsFilter> {
+        self.filters.get_mut(&self.selected_branch)
+    }
+
+    pub fn get_current_cache(&self) -> Option<&Vec<ArtifactoryDirectoryChild>> {
+        self.cache.get(&self.selected_branch)
+    }
 }
 
 struct GuiApp {
@@ -116,9 +138,15 @@ impl epi::App for GuiApp {
         self.logger.loaded_from = Some(logging::get_path());
         self.versions.cache.insert(
             develop_branch(),
-            versions::get_packages_info("develop".to_string()).children,
+            self.versions
+                .client
+                .get_packages_info(&develop_branch())
+                .children,
         );
-        self.sort_children();
+        self.versions.branch_names = self.versions.client.get_branch_names();
+        self.versions.selected_branch = develop_branch();
+        self.sort_cache();
+        self.populate_filter_options();
     }
 
     fn name(&self) -> &str {
@@ -235,38 +263,64 @@ impl GuiApp {
         ui.heading("Versions");
 
         if ui.button("Refresh").clicked() {
+            todo!();
             self.versions.cache.insert(
                 develop_branch(),
-                versions::get_packages_info("develop".to_string()).children,
+                self.versions
+                    .client
+                    .get_packages_info(&develop_branch())
+                    .children,
             );
-            self.sort_children();
+            self.sort_cache();
+            self.populate_filter_options();
         }
 
+        egui::ComboBox::from_id_source("branches_dropdown").selected_text(&self.versions.selected_branch).show_ui(ui, |ui| {
+            for branch in &self.versions.branch_names {
+                ui.selectable_value(&mut self.versions.selected_branch, branch.clone(), branch);
+            }
+        });
+
         ui.horizontal(|ui| {
-            filter_dropdown(
-                ui,
-                "Major",
-                &mut self.versions.major_filter,
-                &self.versions.major_filter_options,
-            );
-            filter_dropdown(
-                ui,
-                "Minor",
-                &mut self.versions.minor_filter,
-                &self.versions.minor_filter_options,
-            );
-            filter_dropdown(
-                ui,
-                "Patch",
-                &mut self.versions.patch_filter,
-                &self.versions.patch_filter_options,
-            );
+            if let Some(filter) = self.versions.get_current_filter_mut() {
+                filter_dropdown(
+                    ui,
+                    "Major",
+                    &mut filter.major_filter,
+                    &filter.major_filter_options,
+                );
+                filter_dropdown(
+                    ui,
+                    "Minor",
+                    &mut filter.minor_filter,
+                    &filter.minor_filter_options,
+                );
+                filter_dropdown(
+                    ui,
+                    "Patch",
+                    &mut filter.patch_filter,
+                    &filter.patch_filter_options,
+                );
+            }
         });
 
         egui::ScrollArea::vertical()
             .id_source("versions_scroll")
             .show(ui, |ui| {
-                for child in self.versions.cache.get(&develop_branch()).unwrap() {
+                if self.versions.get_current_cache().is_none() {
+                    self.versions.cache.insert(
+                        self.versions.selected_branch.clone(),
+                        self.versions
+                            .client
+                            .get_packages_info(&self.versions.selected_branch)
+                            .children,
+                    );
+                    // TODO: these do a lot, we could do less?
+                    self.sort_cache();
+                    self.populate_filter_options();
+                }
+                for child in self.versions.get_current_cache().unwrap()
+                {
                     if let Some((version, date)) = get_version_and_date_from_uri(&child.uri) {
                         if !self.filter_match(version) {
                             continue;
@@ -280,10 +334,12 @@ impl GuiApp {
                                         "{}/{}/{}{}",
                                         BASE_DOWNLOAD_URL,
                                         package_segments(),
-                                        "develop",
+                                        self.versions.selected_branch,
                                         &child.uri
                                     );
-                                    versions::download(url, child.uri.trim_start_matches("/"))
+                                    self.versions
+                                        .client
+                                        .download(url, child.uri.trim_start_matches("/"))
                                         .expect("download failed");
                                 }
                             });
@@ -294,19 +350,21 @@ impl GuiApp {
     }
 
     fn filter_match(&self, version: &str) -> bool {
-        if let Some(v) = parse_semver(version) {
-            if let Some(filter) = self.versions.major_filter {
-                if v.major != filter {
+        if let (Some(version), Some(filter)) =
+            (parse_semver(version), self.versions.get_current_filter())
+        {
+            if let Some(major) = filter.major_filter {
+                if version.major != major {
                     return false;
                 }
             }
-            if let Some(filter) = self.versions.minor_filter {
-                if v.minor != filter {
+            if let Some(minor) = filter.minor_filter {
+                if version.minor != minor {
                     return false;
                 }
             }
-            if let Some(filter) = self.versions.patch_filter {
-                if v.patch != filter {
+            if let Some(patch) = filter.patch_filter {
+                if version.patch != patch {
                     return false;
                 }
             }
@@ -314,34 +372,42 @@ impl GuiApp {
         true
     }
 
-    fn sort_children(&mut self) {
-        let mut data = self.versions.cache.get(&develop_branch()).unwrap().clone();
-        data.sort_by(|a, b| {
-            let parsed_a = get_version_and_date_from_uri(&a.uri)
-                .and_then(|version_date| versions::parse_semver(version_date.0));
-            let parsed_b = get_version_and_date_from_uri(&b.uri)
-                .and_then(|version_date| versions::parse_semver(version_date.0));
+    fn sort_cache(&mut self) {
+        for (_, children) in &mut self.versions.cache {
+            children.sort_by(|a, b| {
+                let parsed_a = get_version_and_date_from_uri(&a.uri)
+                    .and_then(|version_date| versions::parse_semver(version_date.0));
+                let parsed_b = get_version_and_date_from_uri(&b.uri)
+                    .and_then(|version_date| versions::parse_semver(version_date.0));
 
-            if parsed_a.is_some() && parsed_b.is_some() {
-                return parsed_a.unwrap().partial_cmp(&parsed_b.unwrap()).unwrap();
-            }
+                if parsed_a.is_some() && parsed_b.is_some() {
+                    return parsed_a.unwrap().partial_cmp(&parsed_b.unwrap()).unwrap();
+                }
 
-            if parsed_a.is_none() {
-                Ordering::Greater
-            } else {
-                Ordering::Less
-            }
-        });
-        self.versions.cache.insert(develop_branch(), data);
+                if parsed_a.is_none() {
+                    Ordering::Greater
+                } else {
+                    Ordering::Less
+                }
+            });
+        }
+    }
 
-        for child in self.versions.cache.get(&develop_branch()).unwrap() {
-            let semver = get_version_and_date_from_uri(&child.uri)
-                .and_then(|version_date| parse_semver(version_date.0));
-            if let Some(v) = semver {
-                self.versions.major_filter_options.insert(v.major);
-                self.versions.minor_filter_options.insert(v.minor);
-                self.versions.patch_filter_options.insert(v.patch);
+    fn populate_filter_options(&mut self) {
+        self.versions.filters.clear();
+
+        for (branch, children) in &mut self.versions.cache {
+            let mut filter = VersionsFilter::default();
+            for child in children {
+                let semver = get_version_and_date_from_uri(&child.uri)
+                    .and_then(|version_date| parse_semver(version_date.0));
+                if let Some(v) = semver {
+                    filter.major_filter_options.insert(v.major);
+                    filter.minor_filter_options.insert(v.minor);
+                    filter.patch_filter_options.insert(v.patch);
+                }
             }
+            self.versions.filters.insert(branch.clone(), filter);
         }
     }
 
@@ -625,7 +691,7 @@ pub fn run() {
     let app = GuiApp::default();
 
     let icon_bytes = include_bytes!("../keysight-logo.ico");
-    let options = match image::load_from_memory_with_format(icon_bytes, ImageFormat::Ico) {
+    let options = match image::load_from_memory_with_format(icon_bytes, image::ImageFormat::Ico) {
         Ok(icon) => {
             let icon = icon.to_rgba8();
             let (icon_width, icon_height) = icon.dimensions();
@@ -639,9 +705,7 @@ pub fn run() {
                 ..Default::default()
             }
         }
-        Err(_) => {
-            eframe::NativeOptions::default()
-        }
+        Err(_) => eframe::NativeOptions::default(),
     };
 
     eframe::run_native(Box::new(app), options);

@@ -5,6 +5,7 @@ mod hwconfig;
 mod logging;
 mod versions;
 
+use crate::versions::VersionsClient;
 use anyhow::Result;
 use cli::*;
 
@@ -48,7 +49,7 @@ fn main() -> Result<()> {
         },
         Command::SigGen(cmd) => match cmd {
             SigGenCommand::Download { version: _ } => {
-                versions::do_stuff()?;
+                VersionsClient::default().do_stuff()?;
             }
             SigGenCommand::List => {}
             SigGenCommand::Run { .. } => {}
