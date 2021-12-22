@@ -1,21 +1,26 @@
 use anyhow::Result;
+use eframe::epi::RepaintSignal;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::fs::File;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 pub struct VersionsClient {
-    client: reqwest::blocking::Client,
+    client: Arc<reqwest::blocking::Client>,
 }
 
 impl Default for VersionsClient {
     fn default() -> Self {
         Self {
-            client: reqwest::blocking::Client::builder()
-                .timeout(Duration::from_secs(1000))
-                .build()
-                .expect("Unabled to create web client"),
+            client: Arc::from(
+                reqwest::blocking::Client::builder()
+                    .timeout(Duration::from_secs(1000))
+                    .build()
+                    .expect("Unable to create web client"),
+            ),
         }
     }
 }
@@ -39,6 +44,13 @@ pub struct ArtifactoryDirectory {
 pub struct ArtifactoryDirectoryChild {
     pub uri: String,
     pub folder: bool,
+}
+
+#[derive(PartialEq, Clone)]
+pub enum DownloadStatus {
+    Idle,
+    Downloading,
+    Error
 }
 
 #[derive(Default, PartialEq)]
@@ -188,13 +200,36 @@ impl VersionsClient {
         Ok(())
     }
 
-    pub fn download(&self, url: String, file_name: &str) -> Result<()> {
+    pub fn download(
+        &self,
+        url: String,
+        file_name: String,
+        status: Arc<Mutex<DownloadStatus>>,
+        repaint: Arc<dyn RepaintSignal>,
+    ) -> Result<()> {
         let destination_dir = dirs::download_dir().unwrap_or(dirs::home_dir().ok_or(
             anyhow::Error::msg("Could not find Downloads or Home directories"),
         )?);
-        let mut out = File::create(format!("{}/{}", destination_dir.display(), file_name))?;
 
-        self.client.get(url).send()?.copy_to(&mut out)?;
+        let client = self.client.clone();
+        std::thread::spawn(move || {
+            {
+                let mut locked = status.lock().unwrap();
+                *locked = DownloadStatus::Downloading;
+            }
+            match download_internal(&client, &url, &destination_dir, &file_name) {
+                Ok(_) => {
+                    let mut locked = status.lock().unwrap();
+                    *locked = DownloadStatus::Idle;
+                }
+                Err(_) => {
+                    let mut locked = status.lock().unwrap();
+                    *locked = DownloadStatus::Error;
+                }
+            }
+            repaint.request_repaint();
+        });
+
         Ok(())
     }
 
@@ -231,6 +266,17 @@ impl VersionsClient {
         };
         result
     }
+}
+
+fn download_internal(
+    client: &Arc<reqwest::blocking::Client>,
+    url: &String,
+    destination_dir: &PathBuf,
+    file_name: &String,
+) -> Result<()> {
+    let mut out = File::create(format!("{}/{}", destination_dir.display(), file_name))?;
+    client.get(url).send()?.copy_to(&mut out)?;
+    Ok(())
 }
 
 pub fn package_segments() -> String {

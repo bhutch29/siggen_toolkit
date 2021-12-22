@@ -1,19 +1,17 @@
 use crate::cli::SimulatedChannel;
 use crate::logging::{Bool, Level, Logger, LoggingConfiguration, Sink};
-use crate::versions::{
-    develop_branch, package_segments, parse_semver, ArtifactoryDirectoryChild, VersionsClient,
-    BASE_DOWNLOAD_URL,
-};
+use crate::versions::{develop_branch, package_segments, parse_semver, ArtifactoryDirectoryChild, VersionsClient, BASE_DOWNLOAD_URL, DownloadStatus};
 use crate::{common, hwconfig, logging, versions};
 use clipboard::ClipboardProvider;
+use eframe::egui::Vec2;
 use eframe::epi::egui::Color32;
 use eframe::{egui, egui::Button, egui::CtxRef, egui::Ui, epi};
 use std::cmp::Ordering;
 use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 use strum::{Display, EnumIter, IntoEnumIterator};
-use eframe::egui::Vec2;
 
 #[derive(PartialEq, EnumIter, Display)]
 enum Tabs {
@@ -55,6 +53,7 @@ struct VersionsState {
     branch_names: BTreeSet<String>,
     selected_branch: String,
     filters: HashMap<String, VersionsFilter>,
+    status: HashMap<(String, String, String), Arc<Mutex<versions::DownloadStatus>>>,
 }
 
 impl VersionsState {
@@ -124,7 +123,7 @@ impl epi::App for GuiApp {
                 self.logging(ui);
             }
             Tabs::Versions => {
-                self.versions(ui);
+                self.versions(ui, frame);
             }
         });
     }
@@ -260,7 +259,7 @@ impl GuiApp {
             });
     }
 
-    fn versions(&mut self, ui: &mut Ui) {
+    fn versions(&mut self, ui: &mut Ui, frame: &mut epi::Frame<'_>) {
         ui.heading("Versions");
 
         if ui.button("Refresh").clicked() {
@@ -276,11 +275,13 @@ impl GuiApp {
             self.populate_filter_options();
         }
 
-        egui::ComboBox::from_id_source("branches_dropdown").selected_text(&self.versions.selected_branch).show_ui(ui, |ui| {
-            for branch in &self.versions.branch_names {
-                ui.selectable_value(&mut self.versions.selected_branch, branch.clone(), branch);
-            }
-        });
+        egui::ComboBox::from_id_source("branches_dropdown")
+            .selected_text(&self.versions.selected_branch)
+            .show_ui(ui, |ui| {
+                for branch in &self.versions.branch_names {
+                    ui.selectable_value(&mut self.versions.selected_branch, branch.clone(), branch);
+                }
+            });
 
         ui.horizontal(|ui| {
             if let Some(filter) = self.versions.get_current_filter_mut() {
@@ -320,39 +321,108 @@ impl GuiApp {
                     self.sort_cache();
                     self.populate_filter_options();
                 }
-                for child in self.versions.get_current_cache().unwrap()
-                {
+                for child in self.versions.get_current_cache().unwrap().clone() {
                     if let Some((version, date)) = get_version_and_date_from_uri(&child.uri) {
                         if !self.filter_match(version) {
                             continue;
                         }
 
                         ui.horizontal(|ui| {
-                            ui.label(format!("{} ({})", version, date));
-                            ui.horizontal(|ui| {
-                                if ui.button(" ⬇ Download ").clicked() {
-                                    let url = format!(
-                                        "{}/{}/{}{}",
-                                        BASE_DOWNLOAD_URL,
-                                        package_segments(),
-                                        self.versions.selected_branch,
-                                        &child.uri
-                                    );
-                                    self.versions
-                                        .client
-                                        .download(url, child.uri.trim_start_matches("/"))
-                                        .expect("download failed");
-                                }
-                            });
+                            self.versions_row(
+                                ui,
+                                frame,
+                                version.to_string(),
+                                date.to_string(),
+                                &child.uri,
+                            );
                         });
                     }
                 }
             });
     }
 
+    fn get_package_download_status(&self, version: &String, date: &String) -> DownloadStatus {
+        let status = self.versions.status.get(&(
+            self.versions.selected_branch.clone(),
+            version.clone(),
+            date.clone(),
+        ));
+
+        match status {
+            None => {
+                DownloadStatus::Idle
+            }
+            Some(status) => {
+                status.lock().unwrap().clone()
+            }
+        }
+    }
+
+    fn versions_row(
+        &mut self,
+        ui: &mut Ui,
+        frame: &mut epi::Frame<'_>,
+        version: String,
+        date: String,
+        uri: &String,
+    ) {
+        ui.label(format!("{} ({})", version, date));
+        match self.get_package_download_status(&version, &date) {
+            versions::DownloadStatus::Downloading => {
+                ui.strong("Downloading...");
+            }
+            versions::DownloadStatus::Error => {
+                error_label(ui, "Download Failed");
+                if ui.button(" ⬇ Retry ").clicked() {
+                    self.download_clicked(frame, &version, &date, &uri);
+                }
+            }
+            _ => {
+                if ui.button(" ⬇ Download ").clicked() {
+                    self.download_clicked(frame, &version, &date, &uri);
+                }
+            }
+        }
+    }
+
+    fn download_clicked(
+        &mut self,
+        frame: &mut epi::Frame<'_>,
+        version: &String,
+        date: &String,
+        uri: &String,
+    ) {
+        let status = Arc::from(Mutex::from(versions::DownloadStatus::Idle));
+        self.versions.status.insert(
+            (
+                self.versions.selected_branch.clone(),
+                version.clone(),
+                date.clone(),
+            ),
+            status.clone(),
+        );
+
+        let url = format!(
+            "{}/{}/{}{}",
+            BASE_DOWNLOAD_URL,
+            package_segments(),
+            self.versions.selected_branch,
+            uri
+        );
+        self.versions
+            .client
+            .download(
+                url,
+                uri.trim_start_matches("/").to_string(),
+                status,
+                frame.repaint_signal().clone(),
+            )
+            .expect("download failed");
+    }
+
     fn filter_match(&self, version: &str) -> bool {
         if let (Some(version), Some(filter)) =
-            (parse_semver(version), self.versions.get_current_filter())
+        (parse_semver(version), self.versions.get_current_filter())
         {
             if let Some(major) = filter.major_filter {
                 if version.major != major {
