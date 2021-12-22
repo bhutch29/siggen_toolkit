@@ -12,6 +12,7 @@ use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::path::PathBuf;
 use strum::{Display, EnumIter, IntoEnumIterator};
+use image::ImageFormat;
 
 #[derive(PartialEq, EnumIter, Display)]
 enum Tabs {
@@ -623,20 +624,25 @@ fn level_dropdown(ui: &mut Ui, level: &mut Level, id: impl std::hash::Hash) {
 pub fn run() {
     let app = GuiApp::default();
 
-    // let icon = image::open("keysight-logo.ico")
-    //     .expect("Failed to open icon path")
-    //     .to_rgba8();
-    // let (icon_width, icon_height) = icon.dimensions();
-    //
-    // let options = eframe::NativeOptions {
-    //     icon_data: Some(eframe::epi::IconData {
-    //         rgba: icon.into_raw(),
-    //         width: icon_width,
-    //         height: icon_height,
-    //     }),
-    //     ..Default::default()
-    // };
-    let options = eframe::NativeOptions::default();
+    let icon_bytes = include_bytes!("../keysight-logo.ico");
+    let options = match image::load_from_memory_with_format(icon_bytes, ImageFormat::Ico) {
+        Ok(icon) => {
+            let icon = icon.to_rgba8();
+            let (icon_width, icon_height) = icon.dimensions();
+
+            eframe::NativeOptions {
+                icon_data: Some(eframe::epi::IconData {
+                    rgba: icon.into_raw(),
+                    width: icon_width,
+                    height: icon_height,
+                }),
+                ..Default::default()
+            }
+        }
+        Err(_) => {
+            eframe::NativeOptions::default()
+        }
+    };
 
     eframe::run_native(Box::new(app), options);
 }
