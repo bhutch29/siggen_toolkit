@@ -5,9 +5,9 @@ use clipboard::ClipboardProvider;
 use eframe::epi::egui::Color32;
 pub use eframe::{egui, egui::Button, egui::CtxRef, egui::Ui, epi};
 // use image;
-use crate::versions::{parse_semver, Child};
+use crate::versions::{package_segments, parse_semver, ArtifactoryDirectoryChild, BASE_DOWNLOAD_URL, develop_branch};
 use std::cmp::Ordering;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::path::PathBuf;
 use strum::{Display, EnumIter, IntoEnumIterator};
@@ -37,7 +37,7 @@ struct LoggingState {
 
 #[derive(Default)]
 struct VersionsState {
-    develop_children: Vec<Child>,
+    cache: HashMap<String, Vec<ArtifactoryDirectoryChild>>,
     major_filter_options: BTreeSet<u16>,
     major_filter: Option<u16>,
     minor_filter_options: BTreeSet<u16>,
@@ -112,7 +112,7 @@ impl epi::App for GuiApp {
     ) {
         self.logger.config = logging::get_config_from(&logging::get_path());
         self.logger.loaded_from = Some(logging::get_path());
-        self.versions.develop_children = versions::get().children;
+        self.versions.cache.insert(develop_branch(), versions::get_packages_info("develop".to_string()).children);
         self.sort_children();
     }
 
@@ -230,7 +230,7 @@ impl GuiApp {
         ui.heading("Versions");
 
         if ui.button("Refresh").clicked() {
-            self.versions.develop_children = versions::get().children;
+            self.versions.cache.insert(develop_branch(), versions::get_packages_info("develop".to_string()).children);
             self.sort_children();
         }
 
@@ -258,7 +258,7 @@ impl GuiApp {
         egui::ScrollArea::vertical()
             .id_source("versions_scroll")
             .show(ui, |ui| {
-                for child in &self.versions.develop_children {
+                for child in self.versions.cache.get(&develop_branch()).unwrap() {
                     if let Some((version, date)) = get_version_and_date_from_uri(&child.uri) {
                         if let Some(v) = parse_semver(version) {
                             if let Some(filter) = self.versions.major_filter {
@@ -281,7 +281,15 @@ impl GuiApp {
                             ui.label(format!("{} ({})", version, date));
                             ui.horizontal(|ui| {
                                 if ui.button(" ⬇ Download ").clicked() {
-                                    // TODO: download &child.uri
+                                    let url = format!(
+                                        "{}/{}/{}{}",
+                                        BASE_DOWNLOAD_URL,
+                                        package_segments(),
+                                        "develop",
+                                        &child.uri
+                                    );
+                                    versions::download(url, child.uri.trim_start_matches("/"))
+                                        .expect("download failed");
                                 }
                             });
                         });
@@ -291,7 +299,8 @@ impl GuiApp {
     }
 
     fn sort_children(&mut self) {
-        self.versions.develop_children.sort_by(|a, b| {
+        let mut data = self.versions.cache.get(&develop_branch()).unwrap().clone();
+        data.sort_by(|a, b| {
             let parsed_a = get_version_and_date_from_uri(&a.uri)
                 .and_then(|version_date| versions::parse_semver(version_date.0));
             let parsed_b = get_version_and_date_from_uri(&b.uri)
@@ -307,8 +316,9 @@ impl GuiApp {
                 Ordering::Less
             }
         });
+        self.versions.cache.insert(develop_branch(), data);
 
-        for child in &self.versions.develop_children {
+        for child in self.versions.cache.get(&develop_branch()).unwrap() {
             let semver = get_version_and_date_from_uri(&child.uri)
                 .and_then(|version_date| parse_semver(version_date.0));
             if let Some(v) = semver {

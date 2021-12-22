@@ -1,10 +1,12 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
+use std::fs::File;
+use std::time::Duration;
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Root {
+pub struct ArtifactoryDirectory {
     pub repo: String,
     pub path: String,
     pub created: String,
@@ -12,13 +14,13 @@ pub struct Root {
     pub last_modified: String,
     pub modified_by: String,
     pub last_updated: String,
-    pub children: Vec<Child>,
+    pub children: Vec<ArtifactoryDirectoryChild>,
     pub uri: String,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Child {
+pub struct ArtifactoryDirectoryChild {
     pub uri: String,
     pub folder: bool,
 }
@@ -153,33 +155,67 @@ mod tests {
 }
 
 pub fn do_stuff() -> Result<()> {
-    // TODO
-    // let response = reqwest::blocking::get("https://artifactory.it.keysight.com/artifactory/generic-local-pwsg/siggen/packages-linux/develop/siggen_1-9-1-9_2021-11-22_linux.zip")?;
-    // let response = reqwest::blocking::get("https://artifactory.it.keysight.com/artifactory/generic-local-pwsg/siggen/packages-linux/develop/")?;
     let generic_local_pwsg =
         "https://artifactory.it.keysight.com/artifactory/api/storage/generic-local-pwsg/siggen";
     let response =
         reqwest::blocking::get(format!("{}/packages-linux/develop", generic_local_pwsg))?;
-    let temp: Root = serde_json::from_str(&response.text()?)?;
+    let temp: ArtifactoryDirectory = serde_json::from_str(&response.text()?)?;
     dbg!(&temp);
 
     for child in temp.children {
         println!("{}", child.uri);
     }
-    // let bytes = response.bytes()?;
-    // let mut out = File::create("/home/bhutch/projects/siggen_toolkit/temp.zip")?;
-    // std::io::copy(&mut bytes.as_ref(), &mut out)?;
 
     Ok(())
 }
 
-pub fn get() -> Root {
-    let generic_local_pwsg =
-        "https://artifactory.it.keysight.com/artifactory/api/storage/generic-local-pwsg/siggen";
-    match reqwest::blocking::get(format!("{}/packages-linux/develop", generic_local_pwsg)) {
+pub fn download(url: String, file_name: &str) -> Result<()> {
+    let mut out = File::create(format!(
+        "{}/{}",
+        dirs::download_dir()
+            .unwrap_or(dirs::home_dir().ok_or(anyhow::Error::msg(
+                "Could not find Downloads or Home directories"
+            ))?)
+            .display(),
+        file_name
+    ))?;
+
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(1000))
+        .build()?;
+
+    let response = client.get(url).send()?;
+    let bytes = response.bytes()?;
+    std::io::copy(&mut bytes.as_ref(), &mut out)?;
+    Ok(())
+}
+
+pub fn get_packages_info(branch: String) -> ArtifactoryDirectory {
+    match reqwest::blocking::get(format!("{}/{}/{}", BASE_API_URL, package_segments(), branch)) {
         Ok(response) => {
             serde_json::from_str(&response.text().unwrap_or_default()).unwrap_or_default()
         }
-        _ => Root::default(),
+        _ => ArtifactoryDirectory::default(),
     }
 }
+
+pub fn package_segments() -> String {
+    format!(
+        "{}/{}",
+        "generic-local-pwsg/siggen",
+        if cfg!(windows) {
+            "packages"
+        } else {
+            "packages-linux"
+        }
+    )
+}
+
+pub fn develop_branch() -> String {
+    DEVELOP_BRANCH.to_string()
+}
+
+pub const DEVELOP_BRANCH: &str = "develop";
+pub const BASE_DOWNLOAD_URL: &'static str = "https://artifactory.it.keysight.com/artifactory";
+pub const BASE_API_URL: &'static str =
+    "https://artifactory.it.keysight.com/artifactory/api/storage";
