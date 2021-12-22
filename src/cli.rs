@@ -77,3 +77,9 @@ pub enum SimulatedChannel {
         signal_count: u8,
     },
 }
+
+impl Default for SimulatedChannel {
+    fn default() -> Self {
+        Self::MCS31 { signal_count: 1 }
+    }
+}

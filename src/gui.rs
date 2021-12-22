@@ -1,11 +1,12 @@
 use crate::cli::SimulatedChannel;
 use crate::logging::{Bool, Level, Logger, LoggingConfiguration, Sink};
+use crate::versions::{
+    develop_branch, package_segments, parse_semver, ArtifactoryDirectoryChild, BASE_DOWNLOAD_URL,
+};
 use crate::{common, hwconfig, logging, versions};
 use clipboard::ClipboardProvider;
 use eframe::epi::egui::Color32;
-pub use eframe::{egui, egui::Button, egui::CtxRef, egui::Ui, epi};
-// use image;
-use crate::versions::{package_segments, parse_semver, ArtifactoryDirectoryChild, BASE_DOWNLOAD_URL, develop_branch};
+use eframe::{egui, egui::Button, egui::CtxRef, egui::Ui, epi};
 use std::cmp::Ordering;
 use std::collections::{BTreeSet, HashMap};
 use std::fs;
@@ -112,7 +113,10 @@ impl epi::App for GuiApp {
     ) {
         self.logger.config = logging::get_config_from(&logging::get_path());
         self.logger.loaded_from = Some(logging::get_path());
-        self.versions.cache.insert(develop_branch(), versions::get_packages_info("develop".to_string()).children);
+        self.versions.cache.insert(
+            develop_branch(),
+            versions::get_packages_info("develop".to_string()).children,
+        );
         self.sort_children();
     }
 
@@ -230,7 +234,10 @@ impl GuiApp {
         ui.heading("Versions");
 
         if ui.button("Refresh").clicked() {
-            self.versions.cache.insert(develop_branch(), versions::get_packages_info("develop".to_string()).children);
+            self.versions.cache.insert(
+                develop_branch(),
+                versions::get_packages_info("develop".to_string()).children,
+            );
             self.sort_children();
         }
 
@@ -260,23 +267,10 @@ impl GuiApp {
             .show(ui, |ui| {
                 for child in self.versions.cache.get(&develop_branch()).unwrap() {
                     if let Some((version, date)) = get_version_and_date_from_uri(&child.uri) {
-                        if let Some(v) = parse_semver(version) {
-                            if let Some(filter) = self.versions.major_filter {
-                                if v.major != filter {
-                                    continue;
-                                }
-                            }
-                            if let Some(filter) = self.versions.minor_filter {
-                                if v.minor != filter {
-                                    continue;
-                                }
-                            }
-                            if let Some(filter) = self.versions.patch_filter {
-                                if v.patch != filter {
-                                    continue;
-                                }
-                            }
+                        if !self.filter_match(version) {
+                            continue;
                         }
+
                         ui.horizontal(|ui| {
                             ui.label(format!("{} ({})", version, date));
                             ui.horizontal(|ui| {
@@ -296,6 +290,27 @@ impl GuiApp {
                     }
                 }
             });
+    }
+
+    fn filter_match(&self, version: &str) -> bool {
+        if let Some(v) = parse_semver(version) {
+            if let Some(filter) = self.versions.major_filter {
+                if v.major != filter {
+                    return false;
+                }
+            }
+            if let Some(filter) = self.versions.minor_filter {
+                if v.minor != filter {
+                    return false;
+                }
+            }
+            if let Some(filter) = self.versions.patch_filter {
+                if v.patch != filter {
+                    return false;
+                }
+            }
+        }
+        true
     }
 
     fn sort_children(&mut self) {

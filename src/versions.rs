@@ -170,28 +170,30 @@ pub fn do_stuff() -> Result<()> {
 }
 
 pub fn download(url: String, file_name: &str) -> Result<()> {
-    let mut out = File::create(format!(
-        "{}/{}",
-        dirs::download_dir()
-            .unwrap_or(dirs::home_dir().ok_or(anyhow::Error::msg(
-                "Could not find Downloads or Home directories"
-            ))?)
-            .display(),
-        file_name
-    ))?;
+    let destination_dir = dirs::download_dir().unwrap_or(dirs::home_dir().ok_or(
+        anyhow::Error::msg("Could not find Downloads or Home directories"),
+    )?);
+    let mut out = File::create(format!("{}/{}", destination_dir.display(), file_name))?;
 
-    let client = reqwest::blocking::Client::builder()
+    // TODO: save client for app lifetime
+    reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(1000))
-        .build()?;
-
-    let response = client.get(url).send()?;
-    let bytes = response.bytes()?;
-    std::io::copy(&mut bytes.as_ref(), &mut out)?;
+        .build()?
+        .get(url)
+        .send()?
+        .copy_to(&mut out)?;
+    // let bytes = response.bytes()?;
+    // std::io::copy(&mut bytes.as_ref(), &mut out)?;
     Ok(())
 }
 
 pub fn get_packages_info(branch: String) -> ArtifactoryDirectory {
-    match reqwest::blocking::get(format!("{}/{}/{}", BASE_API_URL, package_segments(), branch)) {
+    match reqwest::blocking::get(format!(
+        "{}/{}/{}",
+        BASE_API_URL,
+        package_segments(),
+        branch
+    )) {
         Ok(response) => {
             serde_json::from_str(&response.text().unwrap_or_default()).unwrap_or_default()
         }
