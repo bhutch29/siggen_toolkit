@@ -703,7 +703,7 @@ pub fn run() {
                     width: icon_width,
                     height: icon_height,
                 }),
-                initial_window_size: Some(Vec2::new(500.0, 300.0)),
+                initial_window_size: Some(Vec2::new(700.0, 700.0)),
                 ..Default::default()
             }
         }
