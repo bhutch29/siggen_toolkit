@@ -13,6 +13,7 @@ use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::path::PathBuf;
 use strum::{Display, EnumIter, IntoEnumIterator};
+use eframe::egui::Vec2;
 
 #[derive(PartialEq, EnumIter, Display)]
 enum Tabs {
@@ -702,6 +703,7 @@ pub fn run() {
                     width: icon_width,
                     height: icon_height,
                 }),
+                initial_window_size: Some(Vec2::new(500.0, 300.0)),
                 ..Default::default()
             }
         }
