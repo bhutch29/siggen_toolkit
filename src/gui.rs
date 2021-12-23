@@ -61,31 +61,59 @@ struct VersionsState {
 }
 
 impl VersionsState {
+    pub fn new(which: VersionsTypes) -> Self {
+        Self {
+            which,
+            ..Self::default()
+        }
+    }
+
     pub fn setup_if_needed(&mut self) {
         if !self.already_setup {
-            let info = match &self.which {
-                VersionsTypes::Packages => {
-                    self.client.get_packages_info(&develop_branch()).children
-                }
-                VersionsTypes::Installers => {
-                    self.client.get_installers_info(&develop_branch()).children
-                }
-            };
-            self.cache.insert(develop_branch(),info );
-            self.branch_names = match &self.which {
-                VersionsTypes::Packages => {
-                    self.client.get_packages_branch_names()
-                }
-                VersionsTypes::Installers => {
-                    self.client.get_installers_branch_names()
-                }
-            };
-            self.sort_cache();
-            self.populate_filter_options();
-
+            self.update_branch_names();
+            self.update_cache(&develop_branch());
             self.already_setup = true;
         }
     }
+
+    fn update_branch_names(&mut self) {
+        self.branch_names = match &self.which {
+            VersionsTypes::Packages => {
+                self.client.get_packages_branch_names()
+            }
+            VersionsTypes::Installers => {
+                self.client.get_installers_branch_names()
+            }
+        };
+    }
+
+    pub fn refresh(&mut self) {
+        self.update_branch_names();
+        self.cache.clear();
+        self.update_current_cache_if_needed();
+    }
+
+    pub fn update_current_cache_if_needed(&mut self) {
+        if self.get_current_cache().is_none() {
+            self.update_cache(&self.selected_branch.clone());
+        }
+    }
+
+    fn update_cache(&mut self, branch: &String) {
+        let info = match &self.which {
+            VersionsTypes::Packages => {
+                self.client.get_packages_info(branch).children
+            }
+            VersionsTypes::Installers => {
+                self.client.get_installers_info(branch).children
+            }
+        };
+        self.cache.insert(branch.clone(),info );
+        // TODO: these do a lot, we could do less?
+        self.sort_cache();
+        self.populate_filter_options();
+    }
+
     pub fn get_current_filter(&self) -> Option<&VersionsFilter> {
         self.filters.get(&self.selected_branch)
     }
@@ -180,14 +208,8 @@ impl Default for GuiApp {
                 write_error: false,
                 remove_error: false,
             },
-            packages: VersionsState {
-                which: VersionsTypes::Packages,
-                ..VersionsState::default()
-            },
-            installers: VersionsState {
-                which: VersionsTypes::Installers,
-                ..VersionsState::default()
-            },
+            packages: VersionsState::new(VersionsTypes::Packages),
+            installers: VersionsState::new(VersionsTypes::Installers),
             selected_tab: Tabs::Logging,
         }
     }
@@ -579,16 +601,7 @@ fn versions(ui: &mut Ui, frame: &mut epi::Frame<'_>, state: &mut VersionsState) 
     });
 
     if ui.button("⟳  Refresh").clicked() {
-        todo!();
-        // state.cache.insert(
-        //     develop_branch(),
-        //     state
-        //         .client
-        //         .get_packages_info(&develop_branch())
-        //         .children,
-        // );
-        // state.sort_cache();
-        // state.populate_filter_options();
+        state.refresh();
     }
 
     ui.separator();
@@ -643,18 +656,7 @@ fn versions(ui: &mut Ui, frame: &mut epi::Frame<'_>, state: &mut VersionsState) 
                     .id_source("versions_scroll")
                     .auto_shrink([false, false])
                     .show(ui, |ui| {
-                        if state.get_current_cache().is_none() {
-                            state.cache.insert(
-                                state.selected_branch.clone(),
-                                state
-                                    .client
-                                    .get_packages_info(&state.selected_branch)
-                                    .children,
-                            );
-                            // TODO: these do a lot, we could do less?
-                            state.sort_cache();
-                            state.populate_filter_options();
-                        }
+                        state.update_current_cache_if_needed();
                         for child in state.get_current_cache().unwrap().clone() {
                             if let Some((version, _)) =
                             get_version_and_date_from_uri(&child.uri)
