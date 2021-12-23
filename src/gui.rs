@@ -37,13 +37,7 @@ impl Default for GuiApp {
                 write_error: false,
                 remove_error: false,
             },
-            logger: LoggingState {
-                config: Default::default(),
-                loaded_from: None,
-                custom_path: String::default(),
-                write_error: false,
-                remove_error: false,
-            },
+            logger: Default::default(),
             packages: VersionsState::new(VersionsTypes::Packages),
             installers: VersionsState::new(VersionsTypes::Installers),
             selected_tab: Tabs::Logging,
@@ -72,6 +66,7 @@ impl epi::App for GuiApp {
                 item_spacing: egui::Vec2::new(8.0, 5.0),
                 scroll_bar_width: 10.0,
                 button_padding: egui::Vec2::new(4.0, 4.0),
+                interact_size: egui::Vec2::new(40.0, 24.0), // Needs to adjust based on button_padding
 
                 ..egui::style::Spacing::default()
             };
@@ -492,6 +487,7 @@ fn versions(ui: &mut Ui, frame: &mut epi::Frame<'_>, state: &mut VersionsState) 
                                 continue;
                             }
                             versions_row(ui, frame, state, &info);
+                            ui.separator();
                         }
                     });
             });
@@ -527,7 +523,7 @@ fn versions_row(
                 }
             }
         }
-    });
+    }).response.on_hover_text(&file_info.full_name);
 }
 
 fn download_clicked(frame: &mut epi::Frame<'_>, state: &mut VersionsState, file_info: &FileInfo) {

@@ -13,6 +13,7 @@ pub struct HwconfigState {
     pub remove_error: bool,
 }
 
+#[derive(Default)]
 pub struct LoggingState {
     pub config: LoggingConfiguration,
     pub custom_path: String,
@@ -31,16 +32,28 @@ pub struct VersionsFilter {
     pub patch_filter: Option<u16>,
 }
 
+pub enum VersionsTypes {
+    Packages,
+    Installers,
+}
+
+impl Default for VersionsTypes {
+    fn default() -> Self {
+        Self::Packages
+    }
+}
+
 #[derive(Default)]
 pub struct VersionsState {
     pub client: VersionsClient,
-    pub cache: HashMap<String, Vec<FileInfo>>,
     pub branch_names: Vec<String>,
     pub selected_branch: String,
-    pub filters: HashMap<String, VersionsFilter>,
     pub status: HashMap<(String, FileInfo), Arc<Mutex<DownloadStatus>>>,
-    pub already_setup: bool,
     pub which: VersionsTypes,
+
+    filters: HashMap<String, VersionsFilter>,
+    cache: HashMap<String, Vec<FileInfo>>,
+    already_setup: bool,
 }
 
 impl VersionsState {
@@ -174,16 +187,5 @@ impl VersionsState {
             None => DownloadStatus::Idle,
             Some(status) => status.lock().unwrap().clone(),
         }
-    }
-}
-
-pub enum VersionsTypes {
-    Packages,
-    Installers,
-}
-
-impl Default for VersionsTypes {
-    fn default() -> Self {
-        Self::Packages
     }
 }
