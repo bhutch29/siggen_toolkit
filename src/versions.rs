@@ -234,10 +234,18 @@ impl VersionsClient {
     }
 
     pub fn get_packages_info(&self, branch: &String) -> ArtifactoryDirectory {
+        self.get_info(branch, &package_segments())
+    }
+
+    pub fn get_installers_info(&self, branch: &String) -> ArtifactoryDirectory {
+        self.get_info(branch, &installer_segments())
+    }
+
+    fn get_info(&self, branch: &String, segments: &String) -> ArtifactoryDirectory {
         let request = self.client.get(format!(
             "{}/{}/{}",
             BASE_API_URL,
-            package_segments(),
+            segments,
             branch
         ));
 
@@ -249,16 +257,24 @@ impl VersionsClient {
         }
     }
 
-    pub fn get_branch_names(&self) -> BTreeSet<String> {
+    pub fn get_packages_branch_names(&self) -> BTreeSet<String> {
+        self.get_branch_names(&package_segments())
+    }
+
+    pub fn get_installers_branch_names(&self) -> BTreeSet<String> {
+        self.get_branch_names(&installer_segments())
+    }
+
+    fn get_branch_names(&self, segments: &String) -> BTreeSet<String> {
         let request = self
             .client
-            .get(format!("{}/{}", BASE_API_URL, package_segments()));
+            .get(format!("{}/{}", BASE_API_URL, segments));
         let mut result = BTreeSet::new();
         match request.send() {
             Ok(response) => {
-                let response: ArtifactoryDirectory =
+                let r: ArtifactoryDirectory =
                     serde_json::from_str(&response.text().unwrap_or_default()).unwrap_or_default();
-                for child in response.children {
+                for child in r.children {
                     result.insert(child.uri.trim_start_matches("/").to_string());
                 }
             }
@@ -289,6 +305,10 @@ pub fn package_segments() -> String {
             "packages-linux"
         }
     )
+}
+
+pub fn installer_segments() -> String {
+    "generic-local-boxer-releases/siggen".to_string()
 }
 
 pub fn develop_branch() -> String {

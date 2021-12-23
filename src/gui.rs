@@ -57,9 +57,35 @@ struct VersionsState {
     filters: HashMap<String, VersionsFilter>,
     status: HashMap<(String, String, String), Arc<Mutex<versions::DownloadStatus>>>,
     already_setup: bool,
+    which: VersionsTypes
 }
 
 impl VersionsState {
+    pub fn setup_if_needed(&mut self) {
+        if !self.already_setup {
+            let info = match &self.which {
+                VersionsTypes::Packages => {
+                    self.client.get_packages_info(&develop_branch()).children
+                }
+                VersionsTypes::Installers => {
+                    self.client.get_installers_info(&develop_branch()).children
+                }
+            };
+            self.cache.insert(develop_branch(),info );
+            self.branch_names = match &self.which {
+                VersionsTypes::Packages => {
+                    self.client.get_packages_branch_names()
+                }
+                VersionsTypes::Installers => {
+                    self.client.get_installers_branch_names()
+                }
+            };
+            self.sort_cache();
+            self.populate_filter_options();
+
+            self.already_setup = true;
+        }
+    }
     pub fn get_current_filter(&self) -> Option<&VersionsFilter> {
         self.filters.get(&self.selected_branch)
     }
@@ -119,11 +145,23 @@ impl VersionsState {
     }
 }
 
+enum VersionsTypes {
+    Packages,
+    Installers
+}
+
+impl Default for VersionsTypes {
+    fn default() -> Self {
+        Self::Packages
+    }
+}
+
 struct GuiApp {
     selected_tab: Tabs,
     hwconfig: HwconfigState,
     logger: LoggingState,
-    versions: VersionsState,
+    packages: VersionsState,
+    installers: VersionsState
 }
 
 impl Default for GuiApp {
@@ -142,7 +180,14 @@ impl Default for GuiApp {
                 write_error: false,
                 remove_error: false,
             },
-            versions: VersionsState::default(),
+            packages: VersionsState {
+                which: VersionsTypes::Packages,
+                ..VersionsState::default()
+            },
+            installers: VersionsState {
+                which: VersionsTypes::Installers,
+                ..VersionsState::default()
+            },
             selected_tab: Tabs::Logging,
         }
     }
@@ -181,10 +226,10 @@ impl epi::App for GuiApp {
                     self.logging(ui);
                 }
                 Tabs::Packages => {
-                    self.versions(ui, frame);
+                    versions(ui, frame, &mut self.packages);
                 }
                 Tabs::Installers => {
-                    self.versions(ui, frame);
+                    versions(ui, frame, &mut self.installers);
                 }
             }
         });
@@ -198,7 +243,8 @@ impl epi::App for GuiApp {
     ) {
         self.logger.config = logging::get_config_from(&logging::get_path());
         self.logger.loaded_from = Some(logging::get_path());
-        self.versions.selected_branch = develop_branch();
+        self.packages.selected_branch = develop_branch();
+        self.installers.selected_branch = develop_branch();
     }
 
     fn name(&self) -> &str {
@@ -309,212 +355,6 @@ impl GuiApp {
                     "MCS1.5",
                 );
             });
-    }
-
-    fn versions(&mut self, ui: &mut Ui, frame: &mut epi::Frame<'_>) {
-        if !self.versions.already_setup {
-            self.versions.cache.insert(
-                develop_branch(),
-                self.versions
-                    .client
-                    .get_packages_info(&develop_branch())
-                    .children,
-            );
-            self.versions.branch_names = self.versions.client.get_branch_names();
-            self.versions.sort_cache();
-            self.versions.populate_filter_options();
-
-            self.versions.already_setup = true;
-        }
-
-        ui.heading("Versions");
-
-        if ui.button("⟳  Refresh").clicked() {
-            todo!();
-            // self.versions.cache.insert(
-            //     develop_branch(),
-            //     self.versions
-            //         .client
-            //         .get_packages_info(&develop_branch())
-            //         .children,
-            // );
-            // self.versions.sort_cache();
-            // self.versions.populate_filter_options();
-        }
-
-        ui.separator();
-
-        ui.columns(2, |columns| {
-            columns[0].strong("Branch:");
-            egui::ComboBox::from_id_source("branches_dropdown")
-                .selected_text(&self.versions.selected_branch)
-                .show_ui(&mut columns[0], |ui| {
-                    for branch in &self.versions.branch_names {
-                        ui.selectable_value(
-                            &mut self.versions.selected_branch,
-                            branch.clone(),
-                            branch,
-                        );
-                    }
-                });
-            columns[0].separator();
-
-            if let Some(latest) = self.versions.latest() {
-                columns[0].strong("Latest Version: ");
-                self.versions_row(&mut columns[0], frame, &latest);
-                columns[0].separator();
-            }
-
-            if let Some(filter) = self.versions.get_current_filter_mut() {
-                columns[0].strong("Filters:");
-                filter_dropdown(
-                    &mut columns[0],
-                    "Major",
-                    &mut filter.major_filter,
-                    &filter.major_filter_options,
-                );
-                filter_dropdown(
-                    &mut columns[0],
-                    "Minor",
-                    &mut filter.minor_filter,
-                    &filter.minor_filter_options,
-                );
-                filter_dropdown(
-                    &mut columns[0],
-                    "Patch",
-                    &mut filter.patch_filter,
-                    &filter.patch_filter_options,
-                );
-            }
-
-            columns[1].with_layout(egui::Layout::left_to_right(), |ui| {
-                ui.separator();
-                ui.with_layout(egui::Layout::default(), |ui| {
-                    egui::ScrollArea::vertical()
-                        .id_source("versions_scroll")
-                        .auto_shrink([false, false])
-                        .show(ui, |ui| {
-                            if self.versions.get_current_cache().is_none() {
-                                self.versions.cache.insert(
-                                    self.versions.selected_branch.clone(),
-                                    self.versions
-                                        .client
-                                        .get_packages_info(&self.versions.selected_branch)
-                                        .children,
-                                );
-                                // TODO: these do a lot, we could do less?
-                                self.versions.sort_cache();
-                                self.versions.populate_filter_options();
-                            }
-                            for child in self.versions.get_current_cache().unwrap().clone() {
-                                if let Some((version, _)) =
-                                    get_version_and_date_from_uri(&child.uri)
-                                {
-                                    if !self.filter_match(&version) {
-                                        continue;
-                                    }
-                                    self.versions_row(ui, frame, &child.uri);
-                                }
-                            }
-                        });
-                });
-            });
-        });
-    }
-
-    fn get_package_download_status(&self, version: &String, date: &String) -> DownloadStatus {
-        let status = self.versions.status.get(&(
-            self.versions.selected_branch.clone(),
-            version.clone(),
-            date.clone(),
-        ));
-
-        match status {
-            None => DownloadStatus::Idle,
-            Some(status) => status.lock().unwrap().clone(),
-        }
-    }
-
-    fn versions_row(&mut self, ui: &mut Ui, frame: &mut epi::Frame<'_>, uri: &String) {
-        ui.horizontal(|ui| {
-            if let Some((version, date)) = get_version_and_date_from_uri(uri) {
-                ui.monospace(format!("{:12} {:15}", version, format!("({})", date)));
-                match self.get_package_download_status(&version, &date) {
-                    DownloadStatus::Downloading => {
-                        ui.strong("Downloading...");
-                    }
-                    DownloadStatus::Error => {
-                        error_label(ui, "Download Failed");
-                        if ui.button("⬇  Retry ").clicked() {
-                            self.download_clicked(frame, &version, &date, &uri);
-                        }
-                    }
-                    _ => {
-                        if ui.button("⬇  Download").clicked() {
-                            self.download_clicked(frame, &version, &date, &uri);
-                        }
-                    }
-                }
-            }
-        });
-    }
-
-    fn download_clicked(
-        &mut self,
-        frame: &mut epi::Frame<'_>,
-        version: &String,
-        date: &String,
-        uri: &String,
-    ) {
-        let status = Arc::from(Mutex::from(DownloadStatus::Idle));
-        self.versions.status.insert(
-            (
-                self.versions.selected_branch.clone(),
-                version.clone(),
-                date.clone(),
-            ),
-            status.clone(),
-        );
-
-        let url = format!(
-            "{}/{}/{}{}",
-            BASE_DOWNLOAD_URL,
-            package_segments(),
-            self.versions.selected_branch,
-            uri
-        );
-        self.versions
-            .client
-            .download(
-                url,
-                uri.trim_start_matches("/").to_string(),
-                status,
-                frame.repaint_signal().clone(),
-            )
-            .expect("download failed");
-    }
-
-    fn filter_match(&self, version: &String) -> bool {
-        if let (Some(version), Some(filter)) =
-            (parse_semver(version), self.versions.get_current_filter())
-        {
-            if let Some(major) = filter.major_filter {
-                if version.major != major {
-                    return false;
-                }
-            }
-            if let Some(minor) = filter.minor_filter {
-                if version.minor != minor {
-                    return false;
-                }
-            }
-            if let Some(patch) = filter.patch_filter {
-                if version.patch != patch {
-                    return false;
-                }
-            }
-        }
-        true
     }
 
     fn logging(&mut self, ui: &mut Ui) {
@@ -729,6 +569,205 @@ impl GuiApp {
         (sinks_to_remove, sinks_to_add_to_loggers)
     }
 }
+
+fn versions(ui: &mut Ui, frame: &mut epi::Frame<'_>, state: &mut VersionsState) {
+    state.setup_if_needed();
+
+    ui.heading(match state.which {
+        VersionsTypes::Packages => {"Packages"}
+        VersionsTypes::Installers => {"Installers"}
+    });
+
+    if ui.button("⟳  Refresh").clicked() {
+        todo!();
+        // state.cache.insert(
+        //     develop_branch(),
+        //     state
+        //         .client
+        //         .get_packages_info(&develop_branch())
+        //         .children,
+        // );
+        // state.sort_cache();
+        // state.populate_filter_options();
+    }
+
+    ui.separator();
+
+    ui.columns(2, |columns| {
+        columns[0].strong("Branch:");
+        egui::ComboBox::from_id_source("branches_dropdown")
+            .selected_text(&state.selected_branch)
+            .show_ui(&mut columns[0], |ui| {
+                for branch in &state.branch_names {
+                    ui.selectable_value(
+                        &mut state.selected_branch,
+                        branch.clone(),
+                        branch,
+                    );
+                }
+            });
+        columns[0].separator();
+
+        if let Some(latest) = state.latest() {
+            columns[0].strong("Latest Version: ");
+            versions_row(&mut columns[0], frame, state, &latest);
+            columns[0].separator();
+        }
+
+        if let Some(filter) = state.get_current_filter_mut() {
+            columns[0].strong("Filters:");
+            filter_dropdown(
+                &mut columns[0],
+                "Major",
+                &mut filter.major_filter,
+                &filter.major_filter_options,
+            );
+            filter_dropdown(
+                &mut columns[0],
+                "Minor",
+                &mut filter.minor_filter,
+                &filter.minor_filter_options,
+            );
+            filter_dropdown(
+                &mut columns[0],
+                "Patch",
+                &mut filter.patch_filter,
+                &filter.patch_filter_options,
+            );
+        }
+
+        columns[1].with_layout(egui::Layout::left_to_right(), |ui| {
+            ui.separator();
+            ui.with_layout(egui::Layout::default(), |ui| {
+                egui::ScrollArea::vertical()
+                    .id_source("versions_scroll")
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
+                        if state.get_current_cache().is_none() {
+                            state.cache.insert(
+                                state.selected_branch.clone(),
+                                state
+                                    .client
+                                    .get_packages_info(&state.selected_branch)
+                                    .children,
+                            );
+                            // TODO: these do a lot, we could do less?
+                            state.sort_cache();
+                            state.populate_filter_options();
+                        }
+                        for child in state.get_current_cache().unwrap().clone() {
+                            if let Some((version, _)) =
+                            get_version_and_date_from_uri(&child.uri)
+                            {
+                                if !filter_match(state, &version) {
+                                    continue;
+                                }
+                                versions_row(ui, frame, state, &child.uri);
+                            }
+                        }
+                    });
+            });
+        });
+    });
+}
+
+
+fn get_package_download_status(state: &mut VersionsState, version: &String, date: &String) -> DownloadStatus {
+    let status = state.status.get(&(
+        state.selected_branch.clone(),
+        version.clone(),
+        date.clone(),
+    ));
+
+    match status {
+        None => DownloadStatus::Idle,
+        Some(status) => status.lock().unwrap().clone(),
+    }
+}
+
+
+fn versions_row(ui: &mut Ui, frame: &mut epi::Frame<'_>, state: &mut VersionsState, uri: &String) {
+    ui.horizontal(|ui| {
+        if let Some((version, date)) = get_version_and_date_from_uri(uri) {
+            ui.monospace(format!("{:12} {:15}", version, format!("({})", date)));
+            match get_package_download_status(state, &version, &date) {
+                DownloadStatus::Downloading => {
+                    ui.strong("Downloading...");
+                }
+                DownloadStatus::Error => {
+                    error_label(ui, "Download Failed");
+                    if ui.button("⬇  Retry ").clicked() {
+                        download_clicked(frame, state, &version, &date, &uri);
+                    }
+                }
+                _ => {
+                    if ui.button("⬇  Download").clicked() {
+                        download_clicked(frame, state, &version, &date, &uri);
+                    }
+                }
+            }
+        }
+    });
+}
+
+fn download_clicked(
+    frame: &mut epi::Frame<'_>,
+    state: &mut VersionsState,
+    version: &String,
+    date: &String,
+    uri: &String,
+) {
+    let status = Arc::from(Mutex::from(DownloadStatus::Idle));
+    state.status.insert(
+        (
+            state.selected_branch.clone(),
+            version.clone(),
+            date.clone(),
+        ),
+        status.clone(),
+    );
+
+    let url = format!(
+        "{}/{}/{}{}",
+        BASE_DOWNLOAD_URL,
+        package_segments(),
+        state.selected_branch,
+        uri
+    );
+    state
+        .client
+        .download(
+            url,
+            uri.trim_start_matches("/").to_string(),
+            status,
+            frame.repaint_signal().clone(),
+        )
+        .expect("download failed");
+}
+
+fn filter_match(state: &mut VersionsState, version: &String) -> bool {
+    if let (Some(version), Some(filter)) =
+    (parse_semver(version), state.get_current_filter())
+    {
+        if let Some(major) = filter.major_filter {
+            if version.major != major {
+                return false;
+            }
+        }
+        if let Some(minor) = filter.minor_filter {
+            if version.minor != minor {
+                return false;
+            }
+        }
+        if let Some(patch) = filter.patch_filter {
+            if version.patch != patch {
+                return false;
+            }
+        }
+    }
+    true
+}
+
 
 fn text_edit_labeled(ui: &mut Ui, label: &str, file_name: &mut String) {
     ui.horizontal(|ui| {
