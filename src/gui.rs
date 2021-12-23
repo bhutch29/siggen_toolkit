@@ -1,8 +1,8 @@
 use crate::cli::SimulatedChannel;
 use crate::logging::{Bool, Level, Logger, LoggingConfiguration, Sink};
 use crate::versions::{
-    develop_branch, package_segments, parse_semver, ArtifactoryDirectoryChild, DownloadStatus,
-    VersionsClient, BASE_DOWNLOAD_URL,
+    develop_branch, package_segments, parse_semver, DownloadStatus, FileInfo, VersionsClient,
+    BASE_DOWNLOAD_URL,
 };
 use crate::{common, hwconfig, logging, versions};
 use clipboard::ClipboardProvider;
@@ -20,7 +20,7 @@ enum Tabs {
     #[strum(serialize = "Hardware Configuration")]
     HwConfig,
     Packages,
-    Installers
+    Installers,
 }
 
 struct HwconfigState {
@@ -51,13 +51,13 @@ struct VersionsFilter {
 #[derive(Default)]
 struct VersionsState {
     client: VersionsClient,
-    cache: HashMap<String, Vec<ArtifactoryDirectoryChild>>,
-    branch_names: BTreeSet<String>,
+    cache: HashMap<String, Vec<FileInfo>>,
+    branch_names: Vec<String>,
     selected_branch: String,
     filters: HashMap<String, VersionsFilter>,
-    status: HashMap<(String, String, String), Arc<Mutex<versions::DownloadStatus>>>,
+    status: HashMap<(String, FileInfo), Arc<Mutex<versions::DownloadStatus>>>,
     already_setup: bool,
-    which: VersionsTypes
+    which: VersionsTypes,
 }
 
 impl VersionsState {
@@ -78,12 +78,8 @@ impl VersionsState {
 
     fn update_branch_names(&mut self) {
         self.branch_names = match &self.which {
-            VersionsTypes::Packages => {
-                self.client.get_packages_branch_names()
-            }
-            VersionsTypes::Installers => {
-                self.client.get_installers_branch_names()
-            }
+            VersionsTypes::Packages => self.client.get_packages_branch_names(),
+            VersionsTypes::Installers => self.client.get_installers_branch_names(),
         };
     }
 
@@ -101,14 +97,10 @@ impl VersionsState {
 
     fn update_cache(&mut self, branch: &String) {
         let info = match &self.which {
-            VersionsTypes::Packages => {
-                self.client.get_packages_info(branch).children
-            }
-            VersionsTypes::Installers => {
-                self.client.get_installers_info(branch).children
-            }
+            VersionsTypes::Packages => self.client.get_packages_info(branch),
+            VersionsTypes::Installers => self.client.get_installers_info(branch),
         };
-        self.cache.insert(branch.clone(),info );
+        self.cache.insert(branch.clone(), info);
         // TODO: these do a lot, we could do less?
         self.sort_cache();
         self.populate_filter_options();
@@ -122,24 +114,21 @@ impl VersionsState {
         self.filters.get_mut(&self.selected_branch)
     }
 
-    pub fn get_current_cache(&self) -> Option<&Vec<ArtifactoryDirectoryChild>> {
+    pub fn get_current_cache(&self) -> Option<&Vec<FileInfo>> {
         self.cache.get(&self.selected_branch)
     }
 
-    pub fn latest(&self) -> Option<String> {
+    pub fn latest(&self) -> Option<FileInfo> {
         self.cache
             .get(&self.selected_branch)
-            .and_then(|children| children.last())
-            .and_then(|last| Some(last.clone().uri))
+            .and_then(|files| files.last().cloned())
     }
 
     pub fn sort_cache(&mut self) {
-        for (_, children) in &mut self.cache {
-            children.sort_by(|a, b| {
-                let parsed_a = get_version_and_date_from_uri(&a.uri)
-                    .and_then(|version_date| versions::parse_semver(&version_date.0));
-                let parsed_b = get_version_and_date_from_uri(&b.uri)
-                    .and_then(|version_date| versions::parse_semver(&version_date.0));
+        for (_, files) in &mut self.cache {
+            files.sort_by(|a, b| {
+                let parsed_a = versions::parse_semver(&a.version);
+                let parsed_b = versions::parse_semver(&b.version);
 
                 if parsed_a.is_some() && parsed_b.is_some() {
                     return parsed_a.unwrap().partial_cmp(&parsed_b.unwrap()).unwrap();
@@ -157,11 +146,10 @@ impl VersionsState {
     pub fn populate_filter_options(&mut self) {
         self.filters.clear();
 
-        for (branch, children) in &mut self.cache {
+        for (branch, files) in &mut self.cache {
             let mut filter = VersionsFilter::default();
-            for child in children {
-                let semver = get_version_and_date_from_uri(&child.uri)
-                    .and_then(|version_date| parse_semver(&version_date.0));
+            for file in files {
+                let semver = parse_semver(&file.version);
                 if let Some(v) = semver {
                     filter.major_filter_options.insert(v.major);
                     filter.minor_filter_options.insert(v.minor);
@@ -175,7 +163,7 @@ impl VersionsState {
 
 enum VersionsTypes {
     Packages,
-    Installers
+    Installers,
 }
 
 impl Default for VersionsTypes {
@@ -189,7 +177,7 @@ struct GuiApp {
     hwconfig: HwconfigState,
     logger: LoggingState,
     packages: VersionsState,
-    installers: VersionsState
+    installers: VersionsState,
 }
 
 impl Default for GuiApp {
@@ -596,8 +584,8 @@ fn versions(ui: &mut Ui, frame: &mut epi::Frame<'_>, state: &mut VersionsState) 
     state.setup_if_needed();
 
     ui.heading(match state.which {
-        VersionsTypes::Packages => {"Packages"}
-        VersionsTypes::Installers => {"Installers"}
+        VersionsTypes::Packages => "Packages",
+        VersionsTypes::Installers => "Installers",
     });
 
     if ui.button("⟳  Refresh").clicked() {
@@ -612,11 +600,7 @@ fn versions(ui: &mut Ui, frame: &mut epi::Frame<'_>, state: &mut VersionsState) 
             .selected_text(&state.selected_branch)
             .show_ui(&mut columns[0], |ui| {
                 for branch in &state.branch_names {
-                    ui.selectable_value(
-                        &mut state.selected_branch,
-                        branch.clone(),
-                        branch,
-                    );
+                    ui.selectable_value(&mut state.selected_branch, branch.clone(), branch);
                 }
             });
         columns[0].separator();
@@ -657,15 +641,11 @@ fn versions(ui: &mut Ui, frame: &mut epi::Frame<'_>, state: &mut VersionsState) 
                     .auto_shrink([false, false])
                     .show(ui, |ui| {
                         state.update_current_cache_if_needed();
-                        for child in state.get_current_cache().unwrap().clone() {
-                            if let Some((version, _)) =
-                            get_version_and_date_from_uri(&child.uri)
-                            {
-                                if !filter_match(state, &version) {
-                                    continue;
-                                }
-                                versions_row(ui, frame, state, &child.uri);
+                        for info in state.get_current_cache().unwrap().clone() {
+                            if !filter_match(state, &info.version) {
+                                continue;
                             }
+                            versions_row(ui, frame, state, &info);
                         }
                     });
             });
@@ -673,13 +653,10 @@ fn versions(ui: &mut Ui, frame: &mut epi::Frame<'_>, state: &mut VersionsState) 
     });
 }
 
-
-fn get_package_download_status(state: &mut VersionsState, version: &String, date: &String) -> DownloadStatus {
-    let status = state.status.get(&(
-        state.selected_branch.clone(),
-        version.clone(),
-        date.clone(),
-    ));
+fn get_package_download_status(state: &mut VersionsState, file_info: &FileInfo) -> DownloadStatus {
+    let status = state
+        .status
+        .get(&(state.selected_branch.clone(), file_info.clone()));
 
     match status {
         None => DownloadStatus::Idle,
@@ -687,60 +664,56 @@ fn get_package_download_status(state: &mut VersionsState, version: &String, date
     }
 }
 
-
-fn versions_row(ui: &mut Ui, frame: &mut epi::Frame<'_>, state: &mut VersionsState, uri: &String) {
+fn versions_row(
+    ui: &mut Ui,
+    frame: &mut epi::Frame<'_>,
+    state: &mut VersionsState,
+    file_info: &FileInfo,
+) {
     ui.horizontal(|ui| {
-        if let Some((version, date)) = get_version_and_date_from_uri(uri) {
-            ui.monospace(format!("{:12} {:15}", version, format!("({})", date)));
-            match get_package_download_status(state, &version, &date) {
-                DownloadStatus::Downloading => {
-                    ui.strong("Downloading...");
+        ui.monospace(format!(
+            "{:12} {:15}",
+            file_info.version,
+            format!("({})", file_info.date)
+        ));
+        match get_package_download_status(state, file_info) {
+            DownloadStatus::Downloading => {
+                ui.strong("Downloading...");
+            }
+            DownloadStatus::Error => {
+                error_label(ui, "Download Failed");
+                if ui.button("⬇  Retry ").clicked() {
+                    download_clicked(frame, state, &file_info);
                 }
-                DownloadStatus::Error => {
-                    error_label(ui, "Download Failed");
-                    if ui.button("⬇  Retry ").clicked() {
-                        download_clicked(frame, state, &version, &date, &uri);
-                    }
-                }
-                _ => {
-                    if ui.button("⬇  Download").clicked() {
-                        download_clicked(frame, state, &version, &date, &uri);
-                    }
+            }
+            _ => {
+                if ui.button("⬇  Download").clicked() {
+                    download_clicked(frame, state, &file_info);
                 }
             }
         }
     });
 }
 
-fn download_clicked(
-    frame: &mut epi::Frame<'_>,
-    state: &mut VersionsState,
-    version: &String,
-    date: &String,
-    uri: &String,
-) {
+fn download_clicked(frame: &mut epi::Frame<'_>, state: &mut VersionsState, file_info: &FileInfo) {
     let status = Arc::from(Mutex::from(DownloadStatus::Idle));
     state.status.insert(
-        (
-            state.selected_branch.clone(),
-            version.clone(),
-            date.clone(),
-        ),
+        (state.selected_branch.clone(), file_info.clone()),
         status.clone(),
     );
 
     let url = format!(
-        "{}/{}/{}{}",
+        "{}/{}/{}/{}",
         BASE_DOWNLOAD_URL,
         package_segments(),
         state.selected_branch,
-        uri
+        &file_info.full_name
     );
     state
         .client
         .download(
             url,
-            uri.trim_start_matches("/").to_string(),
+            file_info.full_name.clone(),
             status,
             frame.repaint_signal().clone(),
         )
@@ -748,9 +721,7 @@ fn download_clicked(
 }
 
 fn filter_match(state: &mut VersionsState, version: &String) -> bool {
-    if let (Some(version), Some(filter)) =
-    (parse_semver(version), state.get_current_filter())
-    {
+    if let (Some(version), Some(filter)) = (parse_semver(version), state.get_current_filter()) {
         if let Some(major) = filter.major_filter {
             if version.major != major {
                 return false;
@@ -769,7 +740,6 @@ fn filter_match(state: &mut VersionsState, version: &String) -> bool {
     }
     true
 }
-
 
 fn text_edit_labeled(ui: &mut Ui, label: &str, file_name: &mut String) {
     ui.horizontal(|ui| {
@@ -857,20 +827,6 @@ pub fn run() {
     };
 
     eframe::run_native(Box::new(app), options);
-}
-
-fn get_version_and_date_from_uri(uri: &String) -> Option<(String, String)> {
-    let formatted = uri
-        .trim_start_matches("/")
-        .trim_start_matches("siggen_")
-        .trim_end_matches(".zip")
-        .trim_end_matches("_linux");
-
-    let split: Vec<&str> = formatted.split("_").take(2).collect();
-    match split[..] {
-        [version, date] => Some((version.to_string(), date.to_string())),
-        _ => None,
-    }
 }
 
 fn filter_dropdown(

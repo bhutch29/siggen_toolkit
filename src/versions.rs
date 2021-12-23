@@ -2,7 +2,6 @@ use anyhow::Result;
 use eframe::epi::RepaintSignal;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
-use std::collections::BTreeSet;
 use std::fs::File;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -44,6 +43,13 @@ pub struct ArtifactoryDirectory {
 pub struct ArtifactoryDirectoryChild {
     pub uri: String,
     pub folder: bool,
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct FileInfo {
+    pub full_name: String,
+    pub version: String,
+    pub date: String,
 }
 
 #[derive(PartialEq, Clone)]
@@ -133,11 +139,11 @@ mod tests {
 
     #[test]
     fn parse() {
-        assert_eq!(parse_semver("1-2-3-4").unwrap().prerelease, Some(4));
-        assert_eq!(parse_semver("1-2-3").unwrap().prerelease, None);
-        assert_eq!(parse_semver("1-2-3-4-5").unwrap().prerelease, Some(4));
-        assert_eq!(parse_semver("1-2").is_none(), true);
-        assert_eq!(parse_semver("1-2-l").is_none(), true);
+        assert_eq!(parse_semver(&"1-2-3-4".to_string()).unwrap().prerelease, Some(4));
+        assert_eq!(parse_semver(&"1-2-3".to_string()).unwrap().prerelease, None);
+        assert_eq!(parse_semver(&"1-2-3-4-5".to_string()).unwrap().prerelease, Some(4));
+        assert_eq!(parse_semver(&"1-2".to_string()).is_none(), true);
+        assert_eq!(parse_semver(&"1-2-l".to_string()).is_none(), true);
     }
 
     #[test]
@@ -233,54 +239,84 @@ impl VersionsClient {
         Ok(())
     }
 
-    pub fn get_packages_info(&self, branch: &String) -> ArtifactoryDirectory {
-        self.get_info(branch, &package_segments())
-    }
+    pub fn get_packages_info(&self, branch: &String) -> Vec<FileInfo> {
+        let info = self.get_info(branch, &package_segments());
+        // TODO:
+        let mut result = Vec::new();
+        for full_name in info {
+            let formatted = full_name
+                .trim_start_matches("siggen_")
+                .trim_end_matches(".zip")
+                .trim_end_matches("_linux");
+            let split: Vec<String> = formatted
+                .split("_")
+                .take(2)
+                .map(|s| s.to_string())
+                .collect();
 
-    pub fn get_installers_info(&self, branch: &String) -> ArtifactoryDirectory {
-        self.get_info(branch, &installer_segments())
-    }
-
-    fn get_info(&self, branch: &String, segments: &String) -> ArtifactoryDirectory {
-        let request = self.client.get(format!(
-            "{}/{}/{}",
-            BASE_API_URL,
-            segments,
-            branch
-        ));
-
-        match request.send() {
-            Ok(response) => {
-                serde_json::from_str(&response.text().unwrap_or_default()).unwrap_or_default()
-            }
-            Err(_) => ArtifactoryDirectory::default(),
+            result.push(FileInfo {
+                full_name,
+                version: split[0].clone(),
+                date: split[1].clone(),
+            });
         }
+        result
     }
 
-    pub fn get_packages_branch_names(&self) -> BTreeSet<String> {
+    pub fn get_installers_info(&self, _branch: &String) -> Vec<FileInfo> {
+        // let info = self.get_info(branch, &installer_segments());
+        Vec::new()
+        // TODO:
+        // let mut result = Vec::new();
+        // for full_name in info {
+        //     let formatted = full_name
+        //         .trim_start_matches("siggen_")
+        //         .trim_end_matches(".zip")
+        //         .trim_end_matches("_linux");
+        //     let split: [String; 2] = formatted.split("_").take(2).collect();
+        //
+        //     result.push(FileInfo {
+        //         full_name,
+        //         version: split[0].clone(),
+        //         date: split[1].clone(),
+        //     });
+        // }
+        // result
+    }
+
+    fn get_info(&self, branch: &String, segments: &String) -> Vec<String> {
+        let response = self
+            .api_request(&format!("{}/{}", segments, branch))
+            .unwrap_or_default();
+        // TODO
+        let mut result = Vec::new();
+        for child in response.children {
+            result.push(child.uri.trim_start_matches("/").to_string());
+        }
+        result
+    }
+
+    pub fn get_packages_branch_names(&self) -> Vec<String> {
         self.get_branch_names(&package_segments())
     }
 
-    pub fn get_installers_branch_names(&self) -> BTreeSet<String> {
+    pub fn get_installers_branch_names(&self) -> Vec<String> {
         self.get_branch_names(&installer_segments())
     }
 
-    fn get_branch_names(&self, segments: &String) -> BTreeSet<String> {
-        let request = self
-            .client
-            .get(format!("{}/{}", BASE_API_URL, segments));
-        let mut result = BTreeSet::new();
-        match request.send() {
-            Ok(response) => {
-                let r: ArtifactoryDirectory =
-                    serde_json::from_str(&response.text().unwrap_or_default()).unwrap_or_default();
-                for child in r.children {
-                    result.insert(child.uri.trim_start_matches("/").to_string());
-                }
+    fn get_branch_names(&self, segments: &String) -> Vec<String> {
+        let mut result = Vec::new();
+        if let Some(response) = self.api_request(segments) {
+            for child in response.children {
+                result.push(child.uri.trim_start_matches("/").to_string());
             }
-            Err(_) => {}
-        };
+        }
         result
+    }
+
+    fn api_request(&self, segments: &String) -> Option<ArtifactoryDirectory> {
+        let request = self.client.get(format!("{}/{}", BASE_API_URL, segments));
+        serde_json::from_str(&request.send().ok()?.text().unwrap_or_default()).ok()?
     }
 }
 
@@ -291,7 +327,7 @@ fn download_internal(
     file_name: &String,
 ) -> Result<()> {
     let mut out = File::create(format!("{}/{}", destination_dir.display(), file_name))?;
-    client.get(url).send()?.copy_to(&mut out)?;
+    client.get(url).send()?.error_for_status()?.copy_to(&mut out)?;
     Ok(())
 }
 
