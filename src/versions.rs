@@ -139,9 +139,15 @@ mod tests {
 
     #[test]
     fn parse() {
-        assert_eq!(parse_semver(&"1-2-3-4".to_string()).unwrap().prerelease, Some(4));
+        assert_eq!(
+            parse_semver(&"1-2-3-4".to_string()).unwrap().prerelease,
+            Some(4)
+        );
         assert_eq!(parse_semver(&"1-2-3".to_string()).unwrap().prerelease, None);
-        assert_eq!(parse_semver(&"1-2-3-4-5".to_string()).unwrap().prerelease, Some(4));
+        assert_eq!(
+            parse_semver(&"1-2-3-4-5".to_string()).unwrap().prerelease,
+            Some(4)
+        );
         assert_eq!(parse_semver(&"1-2".to_string()).is_none(), true);
         assert_eq!(parse_semver(&"1-2-l".to_string()).is_none(), true);
     }
@@ -206,17 +212,26 @@ impl VersionsClient {
         Ok(())
     }
 
-    pub fn download(
+    pub fn download_package(
         &self,
-        url: String,
-        file_name: String,
+        branch: &String,
+        file_name: &String,
         status: Arc<Mutex<DownloadStatus>>,
         repaint: Arc<dyn RepaintSignal>,
     ) -> Result<()> {
+        let url = format!(
+            "{}/{}/{}/{}",
+            BASE_DOWNLOAD_URL,
+            package_segments(),
+            branch,
+            file_name
+        );
+
         let destination_dir = dirs::download_dir().unwrap_or(dirs::home_dir().ok_or(
             anyhow::Error::msg("Could not find Downloads or Home directories"),
         )?);
 
+        let file_name = file_name.clone();
         let client = self.client.clone();
         std::thread::spawn(move || {
             {
@@ -327,7 +342,11 @@ fn download_internal(
     file_name: &String,
 ) -> Result<()> {
     let mut out = File::create(format!("{}/{}", destination_dir.display(), file_name))?;
-    client.get(url).send()?.error_for_status()?.copy_to(&mut out)?;
+    client
+        .get(url)
+        .send()?
+        .error_for_status()?
+        .copy_to(&mut out)?;
     Ok(())
 }
 

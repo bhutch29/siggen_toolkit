@@ -1,14 +1,11 @@
 use crate::cli::SimulatedChannel;
-use crate::logging::{Bool, Level, Logger, LoggingConfiguration, Sink};
-use crate::versions::{
-    develop_branch, package_segments, parse_semver, DownloadStatus, FileInfo, VersionsClient,
-    BASE_DOWNLOAD_URL,
-};
-use crate::{common, hwconfig, logging, versions};
+use crate::gui_state::{HwconfigState, LoggingState, VersionsState, VersionsTypes};
+use crate::logging::{Bool, Level, Logger, Sink};
+use crate::versions::{DownloadStatus, FileInfo};
+use crate::{common, hwconfig, logging};
 use clipboard::ClipboardProvider;
 use eframe::{egui, egui::Button, egui::Color32, egui::CtxRef, egui::Ui, egui::Vec2, epi};
-use std::cmp::Ordering;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -21,155 +18,6 @@ enum Tabs {
     HwConfig,
     Packages,
     Installers,
-}
-
-struct HwconfigState {
-    channel_count: u8,
-    platform: SimulatedChannel,
-    write_error: bool,
-    remove_error: bool,
-}
-
-struct LoggingState {
-    config: LoggingConfiguration,
-    custom_path: String,
-    loaded_from: Option<PathBuf>,
-    write_error: bool,
-    remove_error: bool,
-}
-
-#[derive(Default, Clone)]
-struct VersionsFilter {
-    major_filter_options: BTreeSet<u16>,
-    major_filter: Option<u16>,
-    minor_filter_options: BTreeSet<u16>,
-    minor_filter: Option<u16>,
-    patch_filter_options: BTreeSet<u16>,
-    patch_filter: Option<u16>,
-}
-
-#[derive(Default)]
-struct VersionsState {
-    client: VersionsClient,
-    cache: HashMap<String, Vec<FileInfo>>,
-    branch_names: Vec<String>,
-    selected_branch: String,
-    filters: HashMap<String, VersionsFilter>,
-    status: HashMap<(String, FileInfo), Arc<Mutex<versions::DownloadStatus>>>,
-    already_setup: bool,
-    which: VersionsTypes,
-}
-
-impl VersionsState {
-    pub fn new(which: VersionsTypes) -> Self {
-        Self {
-            which,
-            ..Self::default()
-        }
-    }
-
-    pub fn setup_if_needed(&mut self) {
-        if !self.already_setup {
-            self.update_branch_names();
-            self.update_cache(&develop_branch());
-            self.already_setup = true;
-        }
-    }
-
-    fn update_branch_names(&mut self) {
-        self.branch_names = match &self.which {
-            VersionsTypes::Packages => self.client.get_packages_branch_names(),
-            VersionsTypes::Installers => self.client.get_installers_branch_names(),
-        };
-    }
-
-    pub fn refresh(&mut self) {
-        self.update_branch_names();
-        self.cache.clear();
-        self.update_current_cache_if_needed();
-    }
-
-    pub fn update_current_cache_if_needed(&mut self) {
-        if self.get_current_cache().is_none() {
-            self.update_cache(&self.selected_branch.clone());
-        }
-    }
-
-    fn update_cache(&mut self, branch: &String) {
-        let info = match &self.which {
-            VersionsTypes::Packages => self.client.get_packages_info(branch),
-            VersionsTypes::Installers => self.client.get_installers_info(branch),
-        };
-        self.cache.insert(branch.clone(), info);
-        // TODO: these do a lot, we could do less?
-        self.sort_cache();
-        self.populate_filter_options();
-    }
-
-    pub fn get_current_filter(&self) -> Option<&VersionsFilter> {
-        self.filters.get(&self.selected_branch)
-    }
-
-    pub fn get_current_filter_mut(&mut self) -> Option<&mut VersionsFilter> {
-        self.filters.get_mut(&self.selected_branch)
-    }
-
-    pub fn get_current_cache(&self) -> Option<&Vec<FileInfo>> {
-        self.cache.get(&self.selected_branch)
-    }
-
-    pub fn latest(&self) -> Option<FileInfo> {
-        self.cache
-            .get(&self.selected_branch)
-            .and_then(|files| files.last().cloned())
-    }
-
-    pub fn sort_cache(&mut self) {
-        for (_, files) in &mut self.cache {
-            files.sort_by(|a, b| {
-                let parsed_a = versions::parse_semver(&a.version);
-                let parsed_b = versions::parse_semver(&b.version);
-
-                if parsed_a.is_some() && parsed_b.is_some() {
-                    return parsed_a.unwrap().partial_cmp(&parsed_b.unwrap()).unwrap();
-                }
-
-                if parsed_a.is_none() {
-                    Ordering::Greater
-                } else {
-                    Ordering::Less
-                }
-            });
-        }
-    }
-
-    pub fn populate_filter_options(&mut self) {
-        self.filters.clear();
-
-        for (branch, files) in &mut self.cache {
-            let mut filter = VersionsFilter::default();
-            for file in files {
-                let semver = parse_semver(&file.version);
-                if let Some(v) = semver {
-                    filter.major_filter_options.insert(v.major);
-                    filter.minor_filter_options.insert(v.minor);
-                    filter.patch_filter_options.insert(v.patch);
-                }
-            }
-            self.filters.insert(branch.clone(), filter);
-        }
-    }
-}
-
-enum VersionsTypes {
-    Packages,
-    Installers,
-}
-
-impl Default for VersionsTypes {
-    fn default() -> Self {
-        Self::Packages
-    }
 }
 
 struct GuiApp {
@@ -253,8 +101,6 @@ impl epi::App for GuiApp {
     ) {
         self.logger.config = logging::get_config_from(&logging::get_path());
         self.logger.loaded_from = Some(logging::get_path());
-        self.packages.selected_branch = develop_branch();
-        self.installers.selected_branch = develop_branch();
     }
 
     fn name(&self) -> &str {
@@ -642,7 +488,7 @@ fn versions(ui: &mut Ui, frame: &mut epi::Frame<'_>, state: &mut VersionsState) 
                     .show(ui, |ui| {
                         state.update_current_cache_if_needed();
                         for info in state.get_current_cache().unwrap().clone() {
-                            if !filter_match(state, &info.version) {
+                            if !state.filter_match(&info.version) {
                                 continue;
                             }
                             versions_row(ui, frame, state, &info);
@@ -651,17 +497,6 @@ fn versions(ui: &mut Ui, frame: &mut epi::Frame<'_>, state: &mut VersionsState) 
             });
         });
     });
-}
-
-fn get_package_download_status(state: &mut VersionsState, file_info: &FileInfo) -> DownloadStatus {
-    let status = state
-        .status
-        .get(&(state.selected_branch.clone(), file_info.clone()));
-
-    match status {
-        None => DownloadStatus::Idle,
-        Some(status) => status.lock().unwrap().clone(),
-    }
 }
 
 fn versions_row(
@@ -676,7 +511,7 @@ fn versions_row(
             file_info.version,
             format!("({})", file_info.date)
         ));
-        match get_package_download_status(state, file_info) {
+        match state.get_package_download_status(file_info) {
             DownloadStatus::Downloading => {
                 ui.strong("Downloading...");
             }
@@ -702,43 +537,15 @@ fn download_clicked(frame: &mut epi::Frame<'_>, state: &mut VersionsState, file_
         status.clone(),
     );
 
-    let url = format!(
-        "{}/{}/{}/{}",
-        BASE_DOWNLOAD_URL,
-        package_segments(),
-        state.selected_branch,
-        &file_info.full_name
-    );
     state
         .client
-        .download(
-            url,
-            file_info.full_name.clone(),
+        .download_package(
+            &state.selected_branch,
+            &file_info.full_name,
             status,
             frame.repaint_signal().clone(),
         )
-        .expect("download failed");
-}
-
-fn filter_match(state: &mut VersionsState, version: &String) -> bool {
-    if let (Some(version), Some(filter)) = (parse_semver(version), state.get_current_filter()) {
-        if let Some(major) = filter.major_filter {
-            if version.major != major {
-                return false;
-            }
-        }
-        if let Some(minor) = filter.minor_filter {
-            if version.minor != minor {
-                return false;
-            }
-        }
-        if let Some(patch) = filter.patch_filter {
-            if version.patch != patch {
-                return false;
-            }
-        }
-    }
-    true
+        .expect("Download failed");
 }
 
 fn text_edit_labeled(ui: &mut Ui, label: &str, file_name: &mut String) {
@@ -804,6 +611,31 @@ fn level_dropdown(ui: &mut Ui, level: &mut Level, id: impl std::hash::Hash) {
         });
 }
 
+fn filter_dropdown(
+    ui: &mut Ui,
+    label: &str,
+    filter_val: &mut Option<u16>,
+    filter_options: &BTreeSet<u16>,
+) {
+    ui.add_enabled_ui(filter_options.len() > 1, |ui| {
+        egui::ComboBox::from_label(label)
+            .selected_text(format!(
+                "{}",
+                if filter_val.is_none() {
+                    "*".to_string()
+                } else {
+                    filter_val.unwrap().to_string()
+                }
+            ))
+            .show_ui(ui, |ui| {
+                ui.selectable_value(filter_val, None, "*");
+                for option in filter_options {
+                    ui.selectable_value(filter_val, Some(*option), option.to_string());
+                }
+            })
+    });
+}
+
 pub fn run() {
     let app = GuiApp::default();
 
@@ -829,27 +661,3 @@ pub fn run() {
     eframe::run_native(Box::new(app), options);
 }
 
-fn filter_dropdown(
-    ui: &mut Ui,
-    label: &str,
-    filter_val: &mut Option<u16>,
-    filter_options: &BTreeSet<u16>,
-) {
-    ui.add_enabled_ui(filter_options.len() > 1, |ui| {
-        egui::ComboBox::from_label(label)
-            .selected_text(format!(
-                "{}",
-                if filter_val.is_none() {
-                    "*".to_string()
-                } else {
-                    filter_val.unwrap().to_string()
-                }
-            ))
-            .show_ui(ui, |ui| {
-                ui.selectable_value(filter_val, None, "*");
-                for option in filter_options {
-                    ui.selectable_value(filter_val, Some(*option), option.to_string());
-                }
-            })
-    });
-}

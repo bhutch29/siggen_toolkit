@@ -1,6 +1,7 @@
 mod cli;
 mod common;
 mod gui;
+mod gui_state;
 mod hwconfig;
 mod logging;
 mod versions;
