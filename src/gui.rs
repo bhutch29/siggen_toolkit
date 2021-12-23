@@ -19,7 +19,8 @@ enum Tabs {
     Logging,
     #[strum(serialize = "Hardware Configuration")]
     HwConfig,
-    Versions,
+    Packages,
+    Installers
 }
 
 struct HwconfigState {
@@ -76,6 +77,45 @@ impl VersionsState {
             .get(&self.selected_branch)
             .and_then(|children| children.last())
             .and_then(|last| Some(last.clone().uri))
+    }
+
+    pub fn sort_cache(&mut self) {
+        for (_, children) in &mut self.cache {
+            children.sort_by(|a, b| {
+                let parsed_a = get_version_and_date_from_uri(&a.uri)
+                    .and_then(|version_date| versions::parse_semver(&version_date.0));
+                let parsed_b = get_version_and_date_from_uri(&b.uri)
+                    .and_then(|version_date| versions::parse_semver(&version_date.0));
+
+                if parsed_a.is_some() && parsed_b.is_some() {
+                    return parsed_a.unwrap().partial_cmp(&parsed_b.unwrap()).unwrap();
+                }
+
+                if parsed_a.is_none() {
+                    Ordering::Greater
+                } else {
+                    Ordering::Less
+                }
+            });
+        }
+    }
+
+    pub fn populate_filter_options(&mut self) {
+        self.filters.clear();
+
+        for (branch, children) in &mut self.cache {
+            let mut filter = VersionsFilter::default();
+            for child in children {
+                let semver = get_version_and_date_from_uri(&child.uri)
+                    .and_then(|version_date| parse_semver(&version_date.0));
+                if let Some(v) = semver {
+                    filter.major_filter_options.insert(v.major);
+                    filter.minor_filter_options.insert(v.minor);
+                    filter.patch_filter_options.insert(v.patch);
+                }
+            }
+            self.filters.insert(branch.clone(), filter);
+        }
     }
 }
 
@@ -140,7 +180,10 @@ impl epi::App for GuiApp {
                 Tabs::Logging => {
                     self.logging(ui);
                 }
-                Tabs::Versions => {
+                Tabs::Packages => {
+                    self.versions(ui, frame);
+                }
+                Tabs::Installers => {
                     self.versions(ui, frame);
                 }
             }
@@ -278,8 +321,8 @@ impl GuiApp {
                     .children,
             );
             self.versions.branch_names = self.versions.client.get_branch_names();
-            self.sort_cache();
-            self.populate_filter_options();
+            self.versions.sort_cache();
+            self.versions.populate_filter_options();
 
             self.versions.already_setup = true;
         }
@@ -295,8 +338,8 @@ impl GuiApp {
             //         .get_packages_info(&develop_branch())
             //         .children,
             // );
-            // self.sort_cache();
-            // self.populate_filter_options();
+            // self.versions.sort_cache();
+            // self.versions.populate_filter_options();
         }
 
         ui.separator();
@@ -360,8 +403,8 @@ impl GuiApp {
                                         .children,
                                 );
                                 // TODO: these do a lot, we could do less?
-                                self.sort_cache();
-                                self.populate_filter_options();
+                                self.versions.sort_cache();
+                                self.versions.populate_filter_options();
                             }
                             for child in self.versions.get_current_cache().unwrap().clone() {
                                 if let Some((version, _)) =
@@ -472,45 +515,6 @@ impl GuiApp {
             }
         }
         true
-    }
-
-    fn sort_cache(&mut self) {
-        for (_, children) in &mut self.versions.cache {
-            children.sort_by(|a, b| {
-                let parsed_a = get_version_and_date_from_uri(&a.uri)
-                    .and_then(|version_date| versions::parse_semver(&version_date.0));
-                let parsed_b = get_version_and_date_from_uri(&b.uri)
-                    .and_then(|version_date| versions::parse_semver(&version_date.0));
-
-                if parsed_a.is_some() && parsed_b.is_some() {
-                    return parsed_a.unwrap().partial_cmp(&parsed_b.unwrap()).unwrap();
-                }
-
-                if parsed_a.is_none() {
-                    Ordering::Greater
-                } else {
-                    Ordering::Less
-                }
-            });
-        }
-    }
-
-    fn populate_filter_options(&mut self) {
-        self.versions.filters.clear();
-
-        for (branch, children) in &mut self.versions.cache {
-            let mut filter = VersionsFilter::default();
-            for child in children {
-                let semver = get_version_and_date_from_uri(&child.uri)
-                    .and_then(|version_date| parse_semver(&version_date.0));
-                if let Some(v) = semver {
-                    filter.major_filter_options.insert(v.major);
-                    filter.minor_filter_options.insert(v.minor);
-                    filter.patch_filter_options.insert(v.patch);
-                }
-            }
-            self.versions.filters.insert(branch.clone(), filter);
-        }
     }
 
     fn logging(&mut self, ui: &mut Ui) {
