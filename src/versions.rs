@@ -50,7 +50,7 @@ pub struct ArtifactoryDirectoryChild {
 pub enum DownloadStatus {
     Idle,
     Downloading,
-    Error
+    Error,
 }
 
 #[derive(Default, PartialEq)]
@@ -85,7 +85,7 @@ impl PartialOrd for SemVer {
     }
 }
 
-pub fn parse_semver(semver: &str) -> Option<SemVer> {
+pub fn parse_semver(semver: &String) -> Option<SemVer> {
     let parts: Vec<Option<u16>> = semver
         .split("-")
         .map(|x| x.parse::<u16>().ok())
