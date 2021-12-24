@@ -22,14 +22,15 @@ pub struct LoggingState {
     pub remove_error: bool,
 }
 
+/// Recursive data structure. Intended to hold Major, Minor, and Patch versions as keys in nested maps
 #[derive(Debug, Default, Clone)]
 pub struct FilterOptions {
     pub next: BTreeMap<u16, FilterOptions>,
 }
 
 impl FilterOptions {
-    pub fn new(map: BTreeMap<u16, FilterOptions>) -> Self {
-        Self { next: map }
+    pub fn new(next: BTreeMap<u16, FilterOptions>) -> Self {
+        Self { next }
     }
 }
 
@@ -192,39 +193,19 @@ impl VersionsState {
     }
 
     pub fn filter_match(&self, version: &String) -> bool {
+        let mut matched = true;
         if let (Some(version), Some(filter)) = (parse_semver(version), self.get_current_filter()) {
-            match filter.major_filter {
-                Some(major) => {
-                    if version.major != major {
-                        return false;
-                    }
-                }
-                None => {
-                    return true;
-                }
+            if let Some(major) = filter.major_filter {
+                matched &= version.major == major;
             }
-            match filter.minor_filter {
-                Some(minor) => {
-                    if version.minor != minor {
-                        return false;
-                    }
-                }
-                None => {
-                    return true;
-                }
+            if let Some(minor) = filter.minor_filter {
+                matched &= version.minor == minor;
             }
-            match filter.patch_filter {
-                Some(patch) => {
-                    if version.patch != patch {
-                        return false;
-                    }
-                }
-                None => {
-                    return true;
-                }
+            if let Some(patch) = filter.patch_filter {
+                matched &= version.patch == patch;
             }
         }
-        true
+        matched
     }
 
     pub fn get_package_download_status(&self, file_info: &FileInfo) -> DownloadStatus {

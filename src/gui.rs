@@ -458,10 +458,19 @@ fn versions(ui: &mut Ui, frame: &mut epi::Frame<'_>, state: &mut VersionsState) 
         if let Some(filter) = state.get_current_filter_mut() {
             columns[0].strong("Filters:");
             let options = &filter.options.next;
+            let major_copy = filter.major_filter.clone();
             filter_dropdown(&mut columns[0], "Major", &mut filter.major_filter, options);
+            if filter.major_filter != major_copy {
+                filter.minor_filter = None;
+                filter.patch_filter = None;
+            }
             if let Some(major_filter) = filter.major_filter {
                 let options = &options.get(&major_filter).unwrap().next;
+                let minor_copy = filter.minor_filter.clone();
                 filter_dropdown(&mut columns[0], "Minor", &mut filter.minor_filter, &options);
+                if filter.minor_filter != minor_copy {
+                    filter.patch_filter = None;
+                }
                 if let Some(minor_filter) = filter.minor_filter {
                     let options = &options.get(&minor_filter).unwrap().next;
                     filter_dropdown(&mut columns[0], "Patch", &mut filter.patch_filter, options);

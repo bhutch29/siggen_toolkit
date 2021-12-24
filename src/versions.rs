@@ -212,6 +212,7 @@ impl VersionsClient {
         Ok(())
     }
 
+    // TODO: download to directories by branch
     pub fn download_package(
         &self,
         branch: &String,
