@@ -108,9 +108,8 @@ impl VersionsState {
             VersionsTypes::Installers => self.client.get_installers_info(branch),
         };
         self.cache.insert(branch.clone(), info);
-        // TODO: these do a lot, we could do less?
-        self.sort_cache();
-        self.populate_filter_options();
+        self.sort_cache_for(branch);
+        self.populate_filter_options_for(branch);
     }
 
     pub fn get_current_filter(&self) -> Option<&VersionsFilter> {
@@ -131,8 +130,8 @@ impl VersionsState {
             .and_then(|files| files.last().cloned())
     }
 
-    pub fn sort_cache(&mut self) {
-        for (_, files) in &mut self.cache {
+    pub fn sort_cache_for(&mut self, branch: &String) {
+        if let Some(files) = self.cache.get_mut(branch) {
             files.sort_by(|a, b| {
                 let parsed_a = parse_semver(&a.version);
                 let parsed_b = parse_semver(&b.version);
@@ -150,10 +149,8 @@ impl VersionsState {
         }
     }
 
-    pub fn populate_filter_options(&mut self) {
-        self.filters.clear();
-
-        for (branch, files) in &mut self.cache {
+    pub fn populate_filter_options_for(&mut self, branch: &String) {
+        if let Some(files) = self.cache.get_mut(branch) {
             let mut filter = VersionsFilter::default();
             for file in files {
                 let semver = parse_semver(&file.version);

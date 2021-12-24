@@ -1,5 +1,5 @@
 use crate::cli::SimulatedChannel;
-use crate::gui_state::{FilterOptions, HwconfigState, LoggingState, VersionsState, VersionsTypes};
+use crate::gui_state::{FilterOptions, HwconfigState, LoggingState, VersionsState, VersionsTypes, VersionsFilter};
 use crate::logging::{Bool, Level, Logger, Sink};
 use crate::versions::{DownloadStatus, FileInfo};
 use crate::{common, hwconfig, logging};
@@ -11,17 +11,17 @@ use std::path::PathBuf;
 use std::sync;
 use strum::{Display, EnumIter, IntoEnumIterator};
 
-#[derive(PartialEq, EnumIter, Display)]
+#[derive(PartialEq, Clone, Copy, EnumIter, Display)]
 enum Tabs {
     Logging,
     #[strum(serialize = "Hardware Configuration")]
     HwConfig,
     Packages,
-    Installers,
+    // Installers,
 }
 
 struct GuiApp {
-    selected_tab: Tabs,
+    selected_tab: Option<Tabs>,
     hwconfig: HwconfigState,
     logger: LoggingState,
     packages: VersionsState,
@@ -40,7 +40,7 @@ impl Default for GuiApp {
             logger: Default::default(),
             packages: VersionsState::new(VersionsTypes::Packages),
             installers: VersionsState::new(VersionsTypes::Installers),
-            selected_tab: Tabs::Logging,
+            selected_tab: Some(Tabs::Logging),
         }
     }
 }
@@ -56,8 +56,13 @@ impl epi::App for GuiApp {
                 });
                 ui.separator();
                 for tab in Tabs::iter() {
-                    self.make_tab(ui, tab);
+                    self.make_tab(ui, Some(tab));
                 }
+
+                ui.with_layout(egui::Layout::right_to_left(), |ui| {
+                    self.make_tab(ui, None);
+                    ui.separator();
+                })
             });
         });
 
@@ -72,17 +77,20 @@ impl epi::App for GuiApp {
             };
 
             match self.selected_tab {
-                Tabs::HwConfig => {
+                Some(Tabs::HwConfig) => {
                     self.hwconfig(ui);
                 }
-                Tabs::Logging => {
+                Some(Tabs::Logging) => {
                     self.logging(ui);
                 }
-                Tabs::Packages => {
+                Some(Tabs::Packages) => {
                     versions(ui, frame, &mut self.packages);
                 }
-                Tabs::Installers => {
-                    versions(ui, frame, &mut self.installers);
+                // Tabs::Installers => {
+                //     versions(ui, frame, &mut self.installers);
+                // }
+                None => {
+                    about(ui);
                 }
             }
         });
@@ -104,9 +112,9 @@ impl epi::App for GuiApp {
 }
 
 impl GuiApp {
-    fn make_tab(&mut self, ui: &mut Ui, tab: Tabs) {
+    fn make_tab(&mut self, ui: &mut Ui, tab: Option<Tabs>) {
         if ui
-            .selectable_label(self.selected_tab == tab, tab.to_string())
+            .selectable_label(self.selected_tab == tab, if tab.is_none() {"About".to_string()} else {tab.unwrap().to_string()})
             .clicked()
         {
             self.selected_tab = tab;
@@ -115,12 +123,14 @@ impl GuiApp {
 
     fn hwconfig(&mut self, ui: &mut Ui) {
         ui.heading("Hardware Configuration");
+        ui.separator();
         ui.strong("Paths indexed by SigGen:");
         for path in hwconfig::valid_paths().iter() {
             self.hwconfig_path(ui, path);
         }
         ui.strong("Current working directory:");
         self.hwconfig_path(ui, &common::in_cwd(hwconfig::file_name()));
+        ui.separator();
 
         ui.heading("Simulated Hardware Configuration");
         self.platform_dropdown(ui);
@@ -210,6 +220,7 @@ impl GuiApp {
 
     fn logging(&mut self, ui: &mut Ui) {
         ui.heading("KSF Logger Configuration");
+        ui.separator();
         ui.strong("Paths indexed by SigGen:");
         for path in logging::valid_paths().iter() {
             self.logging_path(ui, path);
@@ -237,7 +248,7 @@ impl GuiApp {
             egui::ScrollArea::vertical()
                 .id_source("scroll_sinks")
                 .show(&mut columns[0], |ui| {
-                    let (sinks_to_remove, sinks_to_add_to_loggers) = self.sinks(ui);
+                    let (sinks_to_remove, sinks_to_add_to_loggers, sinks_to_remove_from_loggers) = self.sinks(ui);
 
                     for index in sinks_to_remove {
                         self.logger.config.sinks.remove(index);
@@ -246,6 +257,12 @@ impl GuiApp {
                     for sink in sinks_to_add_to_loggers {
                         for logger in self.logger.config.loggers.iter_mut() {
                             logger.sinks.push(sink.clone());
+                        }
+                    }
+
+                    for sink in sinks_to_remove_from_loggers {
+                        for logger in self.logger.config.loggers.iter_mut() {
+                            logger.sinks.retain(|s| s != &sink);
                         }
                     }
                 });
@@ -331,25 +348,33 @@ impl GuiApp {
         loggers_to_remove
     }
 
-    fn sinks(&mut self, ui: &mut Ui) -> (Vec<usize>, Vec<String>) {
+    fn sinks(&mut self, ui: &mut Ui) -> (Vec<usize>, Vec<String>, Vec<String>) {
         let mut sinks_to_remove = vec![];
         let mut sinks_to_add_to_loggers = vec![];
+        let mut sinks_to_remove_from_loggers = vec![];
 
         for (i, sink) in self.logger.config.sinks.iter_mut().enumerate() {
             ui.separator();
 
             ui.horizontal(|ui| {
-                if ui.button(" x ").on_hover_text("Remove").clicked() {
+                if ui.button(" 🗙 ").on_hover_text("Remove").clicked() {
                     sinks_to_remove.push(i);
                 }
+                ui.strong(sink.to_string());
                 if ui
-                    .button(" ✅ ")
+                    .button(" ➕ ")
                     .on_hover_text("Enable on all loggers")
                     .clicked()
                 {
                     sinks_to_add_to_loggers.push(sink.get_name().clone());
                 }
-                ui.strong(sink.to_string());
+                if ui
+                    .button(" ➖ ")
+                    .on_hover_text("Disable on all loggers")
+                    .clicked()
+                {
+                    sinks_to_remove_from_loggers.push(sink.get_name().clone());
+                }
             });
 
             let (name, level) = sink.get_name_and_level_as_mut();
@@ -420,21 +445,32 @@ impl GuiApp {
                 }
             }
         }
-        (sinks_to_remove, sinks_to_add_to_loggers)
+        (sinks_to_remove, sinks_to_add_to_loggers, sinks_to_remove_from_loggers)
     }
+}
+
+fn about(ui: &mut Ui) {
+    ui.heading("About This Tool");
+    ui.separator();
+    const VERSION: &str = env!("CARGO_PKG_VERSION");
+    const AUTHORS: &str = env!("CARGO_PKG_AUTHORS");
+    ui.label(format!("Version: {}", VERSION));
+    ui.label(format!("Authors: {}", AUTHORS));
 }
 
 fn versions(ui: &mut Ui, frame: &mut epi::Frame<'_>, state: &mut VersionsState) {
     state.setup_if_needed();
 
-    ui.heading(match state.which {
-        VersionsTypes::Packages => "Packages",
-        VersionsTypes::Installers => "Installers",
-    });
+    ui.horizontal(|ui| {
+        ui.heading(match state.which {
+            VersionsTypes::Packages => "SigGen Packages",
+            VersionsTypes::Installers => "SigGen Installers",
+        });
 
-    if ui.button("⟳  Refresh").clicked() {
-        state.refresh();
-    }
+        if ui.button("⟳  Refresh").clicked() {
+            state.refresh();
+        }
+    });
 
     ui.separator();
 
@@ -456,42 +492,15 @@ fn versions(ui: &mut Ui, frame: &mut epi::Frame<'_>, state: &mut VersionsState) 
         }
 
         if let Some(filter) = state.get_current_filter_mut() {
-            columns[0].strong("Filters:");
-            let options = &filter.options.next;
-            let major_copy = filter.major_filter.clone();
-            filter_dropdown(&mut columns[0], "Major", &mut filter.major_filter, options);
-            if filter.major_filter != major_copy {
-                filter.minor_filter = None;
-                filter.patch_filter = None;
-            }
-            if let Some(major_filter) = filter.major_filter {
-                let options = &options.get(&major_filter).unwrap().next;
-                let minor_copy = filter.minor_filter.clone();
-                filter_dropdown(&mut columns[0], "Minor", &mut filter.minor_filter, &options);
-                if filter.minor_filter != minor_copy {
-                    filter.patch_filter = None;
-                }
-                if let Some(minor_filter) = filter.minor_filter {
-                    let options = &options.get(&minor_filter).unwrap().next;
-                    filter_dropdown(&mut columns[0], "Patch", &mut filter.patch_filter, options);
-                }
-            }
-
-            match (filter.major_filter, filter.minor_filter) {
-                (None, _) => {
-                    filter.minor_filter = None;
-                    filter.patch_filter = None;
-                }
-                (_, None) => {
-                    filter.patch_filter = None;
-                }
-                _ => {}
-            }
+            columns[0].strong("Version Filters:");
+            version_filters(&mut columns[0], filter)
         }
 
         columns[1].with_layout(egui::Layout::left_to_right(), |ui| {
             ui.separator();
             ui.with_layout(egui::Layout::default(), |ui| {
+                ui.heading("Versions");
+                ui.separator();
                 egui::ScrollArea::vertical()
                     .id_source("versions_scroll")
                     .auto_shrink([false, false])
@@ -508,6 +517,39 @@ fn versions(ui: &mut Ui, frame: &mut epi::Frame<'_>, state: &mut VersionsState) 
             });
         });
     });
+}
+
+fn version_filters(ui: &mut Ui, filter: &mut VersionsFilter) {
+    let options = &filter.options.next;
+    let major_copy = filter.major_filter.clone();
+    filter_dropdown(ui, "Major", &mut filter.major_filter, options);
+    if filter.major_filter != major_copy {
+        filter.minor_filter = None;
+        filter.patch_filter = None;
+    }
+    if let Some(major_filter) = filter.major_filter {
+        let options = &options.get(&major_filter).unwrap().next;
+        let minor_copy = filter.minor_filter.clone();
+        filter_dropdown(ui, "Minor", &mut filter.minor_filter, &options);
+        if filter.minor_filter != minor_copy {
+            filter.patch_filter = None;
+        }
+        if let Some(minor_filter) = filter.minor_filter {
+            let options = &options.get(&minor_filter).unwrap().next;
+            filter_dropdown(ui, "Patch", &mut filter.patch_filter, options);
+        }
+    }
+
+    match (filter.major_filter, filter.minor_filter) {
+        (None, _) => {
+            filter.minor_filter = None;
+            filter.patch_filter = None;
+        }
+        (_, None) => {
+            filter.patch_filter = None;
+        }
+        _ => {}
+    }
 }
 
 fn versions_row(
