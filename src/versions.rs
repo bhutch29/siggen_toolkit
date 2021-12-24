@@ -59,7 +59,7 @@ pub enum DownloadStatus {
     Error,
 }
 
-#[derive(Default, PartialEq)]
+#[derive(Debug, Default, PartialEq)]
 pub struct SemVer {
     pub major: u16,
     pub minor: u16,

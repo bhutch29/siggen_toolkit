@@ -1,8 +1,8 @@
 use crate::cli::SimulatedChannel;
 use crate::logging::LoggingConfiguration;
-use crate::versions::{develop_branch, parse_semver, DownloadStatus, FileInfo, VersionsClient};
+use crate::versions::{develop_branch, parse_semver, DownloadStatus, FileInfo, SemVer, VersionsClient};
 use std::cmp::Ordering;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
@@ -22,13 +22,22 @@ pub struct LoggingState {
     pub remove_error: bool,
 }
 
+#[derive(Debug, Default, Clone)]
+pub struct FilterOptions {
+    pub next: BTreeMap<u16, FilterOptions>,
+}
+
+impl FilterOptions {
+    pub fn new(map: BTreeMap<u16, FilterOptions>) -> Self {
+        Self { next: map }
+    }
+}
+
 #[derive(Default, Clone)]
 pub struct VersionsFilter {
-    pub major_filter_options: BTreeSet<u16>,
+    pub options: FilterOptions,
     pub major_filter: Option<u16>,
-    pub minor_filter_options: BTreeSet<u16>,
     pub minor_filter: Option<u16>,
-    pub patch_filter_options: BTreeSet<u16>,
     pub patch_filter: Option<u16>,
 }
 
@@ -148,30 +157,70 @@ impl VersionsState {
             for file in files {
                 let semver = parse_semver(&file.version);
                 if let Some(v) = semver {
-                    filter.major_filter_options.insert(v.major);
-                    filter.minor_filter_options.insert(v.minor);
-                    filter.patch_filter_options.insert(v.patch);
+                    VersionsState::populate_filter_for_one_version(&v, &mut filter.options)
                 }
             }
             self.filters.insert(branch.clone(), filter);
         }
     }
 
+    fn populate_filter_for_one_version(version: &SemVer, options: &mut FilterOptions) {
+        let mut patch = BTreeMap::new();
+        patch.insert(version.patch, FilterOptions::default());
+        let mut minor = BTreeMap::new();
+        minor.insert(version.minor, FilterOptions::new(patch.clone()));
+
+        match options.next.get_mut(&version.major) {
+            None => {
+                options
+                    .next
+                    .insert(version.major, FilterOptions::new(minor));
+                return;
+            }
+            Some(ref mut major) => match major.next.get_mut(&version.minor) {
+                None => {
+                    major.next.insert(version.minor, FilterOptions::new(patch));
+                    return;
+                }
+                Some(ref mut minor) => {
+                    if !minor.next.contains_key(&version.patch) {
+                        minor.next.insert(version.patch, FilterOptions::default());
+                    }
+                }
+            },
+        }
+    }
+
     pub fn filter_match(&self, version: &String) -> bool {
         if let (Some(version), Some(filter)) = (parse_semver(version), self.get_current_filter()) {
-            if let Some(major) = filter.major_filter {
-                if version.major != major {
-                    return false;
+            match filter.major_filter {
+                Some(major) => {
+                    if version.major != major {
+                        return false;
+                    }
+                }
+                None => {
+                    return true;
                 }
             }
-            if let Some(minor) = filter.minor_filter {
-                if version.minor != minor {
-                    return false;
+            match filter.minor_filter {
+                Some(minor) => {
+                    if version.minor != minor {
+                        return false;
+                    }
+                }
+                None => {
+                    return true;
                 }
             }
-            if let Some(patch) = filter.patch_filter {
-                if version.patch != patch {
-                    return false;
+            match filter.patch_filter {
+                Some(patch) => {
+                    if version.patch != patch {
+                        return false;
+                    }
+                }
+                None => {
+                    return true;
                 }
             }
         }

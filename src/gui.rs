@@ -1,14 +1,14 @@
 use crate::cli::SimulatedChannel;
-use crate::gui_state::{HwconfigState, LoggingState, VersionsState, VersionsTypes};
+use crate::gui_state::{FilterOptions, HwconfigState, LoggingState, VersionsState, VersionsTypes};
 use crate::logging::{Bool, Level, Logger, Sink};
 use crate::versions::{DownloadStatus, FileInfo};
 use crate::{common, hwconfig, logging};
 use clipboard::ClipboardProvider;
-use eframe::{egui, egui::Button, egui::Color32, egui::CtxRef, egui::Ui, egui::Vec2, epi};
-use std::collections::BTreeSet;
+use eframe::{egui, egui::Ui, epi};
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync;
 use strum::{Display, EnumIter, IntoEnumIterator};
 
 #[derive(PartialEq, EnumIter, Display)]
@@ -46,7 +46,7 @@ impl Default for GuiApp {
 }
 
 impl epi::App for GuiApp {
-    fn update(&mut self, ctx: &CtxRef, frame: &mut epi::Frame<'_>) {
+    fn update(&mut self, ctx: &egui::CtxRef, frame: &mut epi::Frame<'_>) {
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
                 egui::menu::menu(ui, "File", |ui| {
@@ -90,7 +90,7 @@ impl epi::App for GuiApp {
 
     fn setup(
         &mut self,
-        _ctx: &CtxRef,
+        _ctx: &egui::CtxRef,
         _frame: &mut epi::Frame<'_>,
         _storage: Option<&dyn epi::Storage>,
     ) {
@@ -151,7 +151,7 @@ impl GuiApp {
             self.hwconfig.remove_error = false;
         }
         if ui
-            .add_enabled(path.exists() && path.is_file(), Button::new("Delete"))
+            .add_enabled(path.exists() && path.is_file(), egui::Button::new("Delete"))
             .clicked()
         {
             self.hwconfig.write_error = false;
@@ -284,7 +284,7 @@ impl GuiApp {
         });
 
         let exists = path.exists() && path.is_file();
-        if ui.add_enabled(exists, Button::new("Load")).clicked() {
+        if ui.add_enabled(exists, egui::Button::new("Load")).clicked() {
             self.logger.config = logging::get_config_from(path);
             self.logger.loaded_from = Some(path.clone());
         }
@@ -296,7 +296,10 @@ impl GuiApp {
                 self.logger.loaded_from = Some(path.clone());
             }
         }
-        if ui.add_enabled(exists, Button::new("Delete")).clicked() {
+        if ui
+            .add_enabled(exists, egui::Button::new("Delete"))
+            .clicked()
+        {
             self.logger.write_error = false;
             self.logger.remove_error = fs::remove_file(path).is_err();
             if Some(path) == self.logger.loaded_from.as_ref() {
@@ -454,24 +457,27 @@ fn versions(ui: &mut Ui, frame: &mut epi::Frame<'_>, state: &mut VersionsState) 
 
         if let Some(filter) = state.get_current_filter_mut() {
             columns[0].strong("Filters:");
-            filter_dropdown(
-                &mut columns[0],
-                "Major",
-                &mut filter.major_filter,
-                &filter.major_filter_options,
-            );
-            filter_dropdown(
-                &mut columns[0],
-                "Minor",
-                &mut filter.minor_filter,
-                &filter.minor_filter_options,
-            );
-            filter_dropdown(
-                &mut columns[0],
-                "Patch",
-                &mut filter.patch_filter,
-                &filter.patch_filter_options,
-            );
+            let options = &filter.options.next;
+            filter_dropdown(&mut columns[0], "Major", &mut filter.major_filter, options);
+            if let Some(major_filter) = filter.major_filter {
+                let options = &options.get(&major_filter).unwrap().next;
+                filter_dropdown(&mut columns[0], "Minor", &mut filter.minor_filter, &options);
+                if let Some(minor_filter) = filter.minor_filter {
+                    let options = &options.get(&minor_filter).unwrap().next;
+                    filter_dropdown(&mut columns[0], "Patch", &mut filter.patch_filter, options);
+                }
+            }
+
+            match (filter.major_filter, filter.minor_filter) {
+                (None, _) => {
+                    filter.minor_filter = None;
+                    filter.patch_filter = None;
+                }
+                (_, None) => {
+                    filter.patch_filter = None;
+                }
+                _ => {}
+            }
         }
 
         columns[1].with_layout(egui::Layout::left_to_right(), |ui| {
@@ -523,11 +529,13 @@ fn versions_row(
                 }
             }
         }
-    }).response.on_hover_text(&file_info.full_name);
+    })
+    .response
+    .on_hover_text(&file_info.full_name);
 }
 
 fn download_clicked(frame: &mut epi::Frame<'_>, state: &mut VersionsState, file_info: &FileInfo) {
-    let status = Arc::from(Mutex::from(DownloadStatus::Idle));
+    let status = sync::Arc::from(sync::Mutex::from(DownloadStatus::Idle));
     state.status.insert(
         (state.selected_branch.clone(), file_info.clone()),
         status.clone(),
@@ -552,7 +560,7 @@ fn text_edit_labeled(ui: &mut Ui, label: &str, file_name: &mut String) {
 }
 
 fn error_label(ui: &mut Ui, label: &str) {
-    ui.colored_label(Color32::from_rgb(255, 0, 0), label);
+    ui.colored_label(egui::Color32::from_rgb(255, 0, 0), label);
 }
 
 fn copyable_path(ui: &mut Ui, path: &PathBuf) {
@@ -611,9 +619,13 @@ fn filter_dropdown(
     ui: &mut Ui,
     label: &str,
     filter_val: &mut Option<u16>,
-    filter_options: &BTreeSet<u16>,
+    filter_options: &BTreeMap<u16, FilterOptions>,
 ) {
-    ui.add_enabled_ui(filter_options.len() > 1, |ui| {
+    let only_one_key = filter_options.keys().len() == 1;
+    if only_one_key {
+        *filter_val = filter_options.keys().next().cloned();
+    }
+    ui.add_enabled_ui(!only_one_key, |ui| {
         egui::ComboBox::from_label(label)
             .selected_text(format!(
                 "{}",
@@ -624,11 +636,13 @@ fn filter_dropdown(
                 }
             ))
             .show_ui(ui, |ui| {
-                ui.selectable_value(filter_val, None, "*");
-                for option in filter_options {
-                    ui.selectable_value(filter_val, Some(*option), option.to_string());
+                if !only_one_key {
+                    ui.selectable_value(filter_val, None, "*");
                 }
-            })
+                for (key, _) in filter_options {
+                    ui.selectable_value(filter_val, Some(*key), key.to_string());
+                }
+            });
     });
 }
 
@@ -647,7 +661,7 @@ pub fn run() {
                     width: icon_width,
                     height: icon_height,
                 }),
-                initial_window_size: Some(Vec2::new(700.0, 700.0)),
+                initial_window_size: Some(egui::Vec2::new(700.0, 700.0)),
                 ..Default::default()
             }
         }
@@ -656,4 +670,3 @@ pub fn run() {
 
     eframe::run_native(Box::new(app), options);
 }
-
