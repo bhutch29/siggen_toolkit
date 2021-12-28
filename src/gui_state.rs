@@ -154,17 +154,17 @@ impl VersionsState {
     pub fn populate_filter_options_for(&mut self, branch: &String) {
         if let Some(files) = self.cache.get_mut(branch) {
             let mut filter = VersionsFilter::default();
-            for file in files {
-                let semver = parse_semver(&file.version);
-                if let Some(v) = semver {
-                    VersionsState::populate_filter_for_one_version(&v, &mut filter.options)
-                }
-            }
+            files
+                .iter()
+                .filter_map(|file| parse_semver(&file.version))
+                .for_each(|semver| {
+                    VersionsState::populate_filter_with_one_version(&semver, &mut filter.options)
+                });
             self.filters.insert(branch.clone(), filter);
         }
     }
 
-    fn populate_filter_for_one_version(version: &SemVer, options: &mut FilterOptions) {
+    fn populate_filter_with_one_version(version: &SemVer, options: &mut FilterOptions) {
         let mut patch = BTreeMap::new();
         patch.insert(version.patch, FilterOptions::default());
         let mut minor = BTreeMap::new();

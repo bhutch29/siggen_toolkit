@@ -2,6 +2,7 @@ use anyhow::Result;
 use eframe::epi::RepaintSignal;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
+use std::collections::VecDeque;
 use std::fs::File;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -256,27 +257,30 @@ impl VersionsClient {
     }
 
     pub fn get_packages_info(&self, branch: &String) -> Vec<FileInfo> {
-        let info = self.get_info(branch, &package_segments());
-        // TODO:
-        let mut result = Vec::new();
-        for full_name in info {
-            let formatted = full_name
-                .trim_start_matches("siggen_")
-                .trim_end_matches(".zip")
-                .trim_end_matches("_linux");
-            let split: Vec<String> = formatted
-                .split("_")
-                .take(2)
-                .map(|s| s.to_string())
-                .collect();
+        self.get_info(branch, &package_segments())
+            .into_iter()
+            .filter_map(|full_name| {
+                let mut split: VecDeque<String> = full_name
+                    .trim_start_matches("siggen_")
+                    .trim_end_matches(".zip")
+                    .trim_end_matches("_linux")
+                    .split("_")
+                    .take(2)
+                    .map(|s| s.to_string())
+                    .collect();
 
-            result.push(FileInfo {
-                full_name,
-                version: split[0].clone(),
-                date: split[1].clone(),
-            });
-        }
-        result
+                let (version, date) = (split.pop_front(), split.pop_front());
+
+                match (version, date) {
+                    (Some(version), Some(date)) => Some(FileInfo {
+                        full_name,
+                        version,
+                        date,
+                    }),
+                    (_, _) => None,
+                }
+            })
+            .collect()
     }
 
     pub fn get_installers_info(&self, _branch: &String) -> Vec<FileInfo> {

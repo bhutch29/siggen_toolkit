@@ -1,7 +1,7 @@
-#[cfg(target_os="windows")]
+#[cfg(target_os = "windows")]
 use serde::Deserialize;
 
-#[cfg(target_os="windows")]
+#[cfg(target_os = "windows")]
 #[derive(Deserialize, Default, Debug)]
 #[serde(rename_all = "PascalCase")]
 struct Provider {
@@ -10,14 +10,14 @@ struct Provider {
     pub event_source_name: Option<String>,
 }
 
-#[cfg(target_os="windows")]
+#[cfg(target_os = "windows")]
 #[derive(Deserialize, Default, Debug)]
 #[serde(rename_all = "PascalCase")]
 struct TimeCreated {
     pub system_time: String,
 }
 
-#[cfg(target_os="windows")]
+#[cfg(target_os = "windows")]
 #[derive(Deserialize, Default, Debug)]
 #[serde(rename_all = "PascalCase")]
 struct System {
@@ -32,7 +32,7 @@ struct System {
     extra: std::collections::HashMap<String, serde_json::Value>,
 }
 
-#[cfg(target_os="windows")]
+#[cfg(target_os = "windows")]
 #[derive(Deserialize, Default, Debug)]
 #[serde(rename_all = "PascalCase")]
 struct Data {
@@ -40,14 +40,14 @@ struct Data {
     extra: std::collections::HashMap<String, serde_json::Value>,
 }
 
-#[cfg(target_os="windows")]
+#[cfg(target_os = "windows")]
 #[derive(Deserialize, Default, Debug)]
 #[serde(rename_all = "PascalCase")]
 struct EventData {
     data: Option<Vec<Data>>,
 }
 
-#[cfg(target_os="windows")]
+#[cfg(target_os = "windows")]
 #[derive(Deserialize, Default, Debug)]
 #[serde(rename_all = "PascalCase")]
 struct MyEvent {
@@ -55,10 +55,10 @@ struct MyEvent {
     pub event_data: EventData,
 }
 
-#[cfg(target_os="windows")]
+#[cfg(target_os = "windows")]
 use win_event_log::prelude::*;
 
-#[cfg(target_os="windows")]
+#[cfg(target_os = "windows")]
 pub fn event_stuff() {
     println!("Events Stuff!");
     let conditions = vec![
@@ -92,8 +92,7 @@ pub fn event_stuff() {
     }
 }
 
-#[cfg(not(target_os="windows"))]
+#[cfg(not(target_os = "windows"))]
 pub fn event_stuff() {
     println!("Not supported on Linux");
 }
-
