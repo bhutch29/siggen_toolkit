@@ -206,3 +206,11 @@ pub fn show() -> Result<()> {
 pub fn file_name() -> String {
     "ksflogger.cfg".to_string()
 }
+
+pub fn remove_invalid_sinks(logger: &mut Logger, sinks: &Vec<Sink>) {
+    logger.sinks.retain(|logger_sink_name| {
+        sinks
+            .iter()
+            .any(|target_sink| target_sink.get_name() == logger_sink_name)
+    });
+}

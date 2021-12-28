@@ -605,14 +605,12 @@ fn download_clicked(frame: &mut epi::Frame<'_>, state: &mut VersionsState, file_
         .entry((state.selected_branch.clone(), file_info.clone()))
         .or_insert(sync::Arc::from(sync::Mutex::from(DownloadStatus::Idle)));
 
-    if let Err(_) = state
-        .client
-        .download_package(
-            &state.selected_branch,
-            &file_info.full_name,
-            status.clone(),
-            frame.repaint_signal().clone(),
-        ) {
+    if let Err(_) = state.client.download_package(
+        &state.selected_branch,
+        &file_info.full_name,
+        status.clone(),
+        frame.repaint_signal().clone(),
+    ) {
         let mut status_lock = status.lock().unwrap();
         *status_lock = DownloadStatus::Error;
     }
@@ -660,15 +658,7 @@ fn sinks_checkboxes(ui: &mut Ui, logger: &mut Logger, sinks: &Vec<Sink>) {
         }
     }
 
-    remove_invalid_sinks(logger, sinks);
-}
-
-fn remove_invalid_sinks(logger: &mut Logger, sinks: &Vec<Sink>) {
-    logger.sinks.retain(|logger_sink_name| {
-        sinks
-            .iter()
-            .any(|target_sink| target_sink.get_name() == logger_sink_name)
-    });
+    logging::remove_invalid_sinks(logger, sinks);
 }
 
 fn level_dropdown(ui: &mut Ui, level: &mut Level, id: impl std::hash::Hash) {
