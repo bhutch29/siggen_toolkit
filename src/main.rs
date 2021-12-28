@@ -5,6 +5,7 @@ mod gui_state;
 mod hwconfig;
 mod logging;
 mod versions;
+mod events;
 
 use crate::versions::VersionsClient;
 use anyhow::Result;
@@ -62,7 +63,11 @@ fn main() -> Result<()> {
             ReportCommand::List { .. } => {}
         },
         Command::Events(cmd) => match cmd {
-            EventsCommand::List { .. } => {}
+            EventsCommand::List { .. } => {
+                if cfg!(windows) {
+                    events::event_stuff();
+                }
+            }
         },
     };
     Ok(())
