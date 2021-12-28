@@ -1,6 +1,8 @@
 use crate::cli::SimulatedChannel;
 use crate::logging::LoggingConfiguration;
-use crate::versions::{develop_branch, parse_semver, DownloadStatus, FileInfo, SemVer, VersionsClient};
+use crate::versions::{
+    develop_branch, parse_semver, DownloadStatus, FileInfo, SemVer, VersionsClient,
+};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
@@ -173,17 +175,16 @@ impl VersionsState {
                 options
                     .next
                     .insert(version.major, FilterOptions::new(minor));
-                return;
             }
             Some(ref mut major) => match major.next.get_mut(&version.minor) {
                 None => {
                     major.next.insert(version.minor, FilterOptions::new(patch));
-                    return;
                 }
                 Some(ref mut minor) => {
-                    if !minor.next.contains_key(&version.patch) {
-                        minor.next.insert(version.patch, FilterOptions::default());
-                    }
+                    minor
+                        .next
+                        .entry(version.patch)
+                        .or_insert(FilterOptions::default());
                 }
             },
         }

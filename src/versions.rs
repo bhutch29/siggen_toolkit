@@ -236,17 +236,17 @@ impl VersionsClient {
         let client = self.client.clone();
         std::thread::spawn(move || {
             {
-                let mut locked = status.lock().unwrap();
-                *locked = DownloadStatus::Downloading;
+                let mut status_lock = status.lock().unwrap();
+                *status_lock = DownloadStatus::Downloading;
             }
             match download_internal(&client, &url, &destination_dir, &file_name) {
                 Ok(_) => {
-                    let mut locked = status.lock().unwrap();
-                    *locked = DownloadStatus::Idle;
+                    let mut status_lock = status.lock().unwrap();
+                    *status_lock = DownloadStatus::Idle;
                 }
                 Err(_) => {
-                    let mut locked = status.lock().unwrap();
-                    *locked = DownloadStatus::Error;
+                    let mut status_lock = status.lock().unwrap();
+                    *status_lock = DownloadStatus::Error;
                 }
             }
             repaint.request_repaint();

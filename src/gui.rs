@@ -1,5 +1,7 @@
 use crate::cli::SimulatedChannel;
-use crate::gui_state::{FilterOptions, HwconfigState, LoggingState, VersionsState, VersionsTypes, VersionsFilter};
+use crate::gui_state::{
+    FilterOptions, HwconfigState, LoggingState, VersionsFilter, VersionsState, VersionsTypes,
+};
 use crate::logging::{Bool, Level, Logger, Sink};
 use crate::versions::{DownloadStatus, FileInfo};
 use crate::{common, hwconfig, logging};
@@ -114,7 +116,14 @@ impl epi::App for GuiApp {
 impl GuiApp {
     fn make_tab(&mut self, ui: &mut Ui, tab: Option<Tabs>) {
         if ui
-            .selectable_label(self.selected_tab == tab, if tab.is_none() {"About".to_string()} else {tab.unwrap().to_string()})
+            .selectable_label(
+                self.selected_tab == tab,
+                if tab.is_none() {
+                    "About".to_string()
+                } else {
+                    tab.unwrap().to_string()
+                },
+            )
             .clicked()
         {
             self.selected_tab = tab;
@@ -248,7 +257,8 @@ impl GuiApp {
             egui::ScrollArea::vertical()
                 .id_source("scroll_sinks")
                 .show(&mut columns[0], |ui| {
-                    let (sinks_to_remove, sinks_to_add_to_loggers, sinks_to_remove_from_loggers) = self.sinks(ui);
+                    let (sinks_to_remove, sinks_to_add_to_loggers, sinks_to_remove_from_loggers) =
+                        self.sinks(ui);
 
                     for index in sinks_to_remove {
                         self.logger.config.sinks.remove(index);
@@ -445,7 +455,11 @@ impl GuiApp {
                 }
             }
         }
-        (sinks_to_remove, sinks_to_add_to_loggers, sinks_to_remove_from_loggers)
+        (
+            sinks_to_remove,
+            sinks_to_add_to_loggers,
+            sinks_to_remove_from_loggers,
+        )
     }
 }
 
@@ -586,21 +600,22 @@ fn versions_row(
 }
 
 fn download_clicked(frame: &mut epi::Frame<'_>, state: &mut VersionsState, file_info: &FileInfo) {
-    let status = sync::Arc::from(sync::Mutex::from(DownloadStatus::Idle));
-    state.status.insert(
-        (state.selected_branch.clone(), file_info.clone()),
-        status.clone(),
-    );
+    let status = state
+        .status
+        .entry((state.selected_branch.clone(), file_info.clone()))
+        .or_insert(sync::Arc::from(sync::Mutex::from(DownloadStatus::Idle)));
 
-    state
+    if let Err(_) = state
         .client
         .download_package(
             &state.selected_branch,
             &file_info.full_name,
-            status,
+            status.clone(),
             frame.repaint_signal().clone(),
-        )
-        .expect("Download failed");
+        ) {
+        let mut status_lock = status.lock().unwrap();
+        *status_lock = DownloadStatus::Error;
+    }
 }
 
 fn text_edit_labeled(ui: &mut Ui, label: &str, file_name: &mut String) {
