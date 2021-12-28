@@ -305,15 +305,10 @@ impl VersionsClient {
     }
 
     fn get_info(&self, branch: &String, segments: &String) -> Vec<String> {
-        let response = self
-            .api_request(&format!("{}/{}", segments, branch))
-            .unwrap_or_default();
-        // TODO
-        let mut result = Vec::new();
-        for child in response.children {
-            result.push(child.uri.trim_start_matches("/").to_string());
-        }
-        result
+        VersionsClient::parse_children(
+            self.api_request(&format!("{}/{}", segments, branch))
+                .unwrap_or_default()
+        )
     }
 
     pub fn get_packages_branch_names(&self) -> Vec<String> {
@@ -325,13 +320,15 @@ impl VersionsClient {
     }
 
     fn get_branch_names(&self, segments: &String) -> Vec<String> {
-        let mut result = Vec::new();
-        if let Some(response) = self.api_request(segments) {
-            for child in response.children {
-                result.push(child.uri.trim_start_matches("/").to_string());
-            }
-        }
-        result
+        VersionsClient::parse_children(self.api_request(segments).unwrap_or_default())
+    }
+
+    fn parse_children(response: ArtifactoryDirectory) -> Vec<String> {
+        response
+            .children
+            .iter()
+            .map(|child| child.uri.trim_start_matches("/").to_string())
+            .collect()
     }
 
     fn api_request(&self, segments: &String) -> Option<ArtifactoryDirectory> {
