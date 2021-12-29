@@ -1,10 +1,11 @@
 use crate::cli::SimulatedChannel;
 use crate::gui_state::{
-    FilterOptions, HwconfigState, LoggingState, VersionsFilter, VersionsState, VersionsTypes,
+    FilterOptions, HwconfigState, LoggingState, ReportsState, VersionsFilter, VersionsState,
+    VersionsTypes,
 };
 use crate::logging::{Bool, Level, Logger, Sink};
-use crate::versions::{DownloadStatus, FileInfo};
-use crate::{common, hwconfig, logging};
+use crate::versions::{installed_version, DownloadStatus, FileInfo};
+use crate::{common, hwconfig, logging, report};
 use clipboard::ClipboardProvider;
 use eframe::{egui, egui::Ui, epi};
 use std::collections::BTreeMap;
@@ -25,7 +26,7 @@ enum Tabs {
     Packages,
     Installers,
     Events,
-    Report,
+    Reports,
 }
 
 struct GuiApp {
@@ -34,6 +35,7 @@ struct GuiApp {
     logger: LoggingState,
     packages: VersionsState,
     installers: VersionsState,
+    reports: ReportsState,
 }
 
 impl Default for GuiApp {
@@ -43,6 +45,7 @@ impl Default for GuiApp {
             logger: Default::default(),
             packages: VersionsState::new(VersionsTypes::Packages),
             installers: VersionsState::new(VersionsTypes::Installers),
+            reports: Default::default(),
             selected_tab: Some(Tabs::Logging),
         }
     }
@@ -95,8 +98,8 @@ impl epi::App for GuiApp {
                 Some(Tabs::Events) => {
                     self.events(ui);
                 }
-                Some(Tabs::Report) => {
-                    // TODO
+                Some(Tabs::Reports) => {
+                    self.report(ui);
                 }
                 None => {
                     about(ui);
@@ -114,6 +117,7 @@ impl epi::App for GuiApp {
         self.logger.config =
             logging::get_config_from(&logging::get_path_or_cwd()).unwrap_or_default();
         self.logger.loaded_from = Some(logging::get_path_or_cwd());
+        self.update_report_summary();
     }
 
     fn name(&self) -> &str {
@@ -136,6 +140,126 @@ impl GuiApp {
         {
             self.selected_tab = tab;
         }
+    }
+
+    fn report(&mut self, ui: &mut Ui) {
+        ui.heading("Reports");
+        ui.separator();
+
+        text_edit_labeled(
+            ui,
+            "Name",
+            &mut self.reports.name,
+            Some("Descriptive name for report .zip file. Required."),
+        );
+        let file_name = report::zip_file_name(&self.reports.name);
+
+        if self.reports.name_changed() {
+            self.reports.generate_status = None;
+            self.reports.file_exists = Path::new(&file_name).exists();
+        }
+
+        ui.horizontal(|ui| {
+            let empty_name = self.reports.name.is_empty();
+            ui.add_enabled_ui(!empty_name && self.reports.generate_status != Some(true), |ui| {
+                if ui.button("Generate Report").clicked() {
+                    self.reports.generate_status = match report::create_report(&self.reports.name) {
+                        Ok(_) => Some(true),
+                        Err(_) => Some(false),
+                    };
+                    self.reports.file_exists = Path::new(&file_name).exists();
+                }
+            });
+
+            match self.reports.generate_status {
+                Some(false) if !self.reports.file_exists => {
+                    error_label(ui, "Generation failed");
+                }
+                Some(false) => {
+                    ui.label(format!("File Name: {}", file_name));
+                    error_label(ui, "Generation failed");
+                }
+                None if self.reports.file_exists => {
+                    ui.label(format!("File Name: {}", file_name));
+                    warning_label(ui, "File already exists, will overwrite");
+                }
+                None if !empty_name => {
+                    ui.label(format!("File Name: {}", file_name));
+                }
+                Some(true) => {
+                    ui.strong("Generation complete.");
+                }
+                _ => {}
+            }
+        });
+
+        ui.separator();
+        ui.horizontal(|ui| {
+            ui.heading("Summary");
+            if ui.button("⟳  Refresh").clicked() {
+                self.update_report_summary();
+            }
+        });
+
+        ui.label(format!(
+            "Installed Version: {}",
+            match &self.reports.installed_version {
+                None => {
+                    "Not Found"
+                }
+                Some(version) => {
+                    version
+                }
+            }
+        ));
+        ui.label(format!(
+            "Log File Path: {}",
+            match &self.reports.log_file_path {
+                None => {
+                    "Not Found".to_string()
+                }
+                Some(path) => {
+                    path.display().to_string()
+                }
+            }
+        ));
+        ui.label(format!(
+            "Log Config Path: {}",
+            match &self.reports.log_cfg_path {
+                None => {
+                    "Not Found".to_string()
+                }
+                Some(path) => {
+                    path.display().to_string()
+                }
+            }
+        ));
+        ui.label(format!(
+            "HW Config Path: {}",
+            match &self.reports.hwconfig_path {
+                None => {
+                    "Not Found".to_string()
+                }
+                Some(path) => {
+                    path.display().to_string()
+                }
+            }
+        ));
+    }
+
+    fn update_report_summary(&mut self) {
+        let log_path = logging::get_log_path();
+        self.reports.log_file_path = if log_path.exists() {
+            Some(log_path)
+        } else {
+            None
+        };
+
+        self.reports.log_cfg_path = logging::get_path();
+        self.reports.hwconfig_path = hwconfig::get_path();
+        self.reports.installed_version = installed_version();
+
+        self.reports.generate_status = None;
     }
 
     fn events(&mut self, ui: &mut Ui) {
@@ -403,11 +527,7 @@ impl GuiApp {
             });
 
             let (name, level) = sink.get_name_and_level_as_mut();
-            ui.horizontal(|ui| {
-                ui.label("Name");
-                ui.add(egui::TextEdit::singleline(name).hint_text("Unique name required"));
-            });
-
+            text_edit_labeled(ui, "Name", name, Some("Unique name required"));
             level_dropdown(ui, level, format!("{} {}", name, i));
 
             match sink {
@@ -418,7 +538,7 @@ impl GuiApp {
                     ref mut max_files,
                     ..
                 } => {
-                    text_edit_labeled(ui, "File Path", file_name);
+                    text_edit_labeled(ui, "File Path", file_name, None);
                     truncate_ui(ui, truncate);
 
                     let mut files = max_files.unwrap_or_default();
@@ -434,7 +554,7 @@ impl GuiApp {
                     ref mut truncate,
                     ..
                 } => {
-                    text_edit_labeled(ui, "File Path", file_name);
+                    text_edit_labeled(ui, "File Path", file_name, None);
                     truncate_ui(ui, truncate);
                 }
                 Sink::DailyFile {
@@ -442,7 +562,7 @@ impl GuiApp {
                     ref mut truncate,
                     ..
                 } => {
-                    text_edit_labeled(ui, "File Path", file_name);
+                    text_edit_labeled(ui, "File Path", file_name, None);
                     truncate_ui(ui, truncate);
                 }
                 Sink::Console {
@@ -463,10 +583,7 @@ impl GuiApp {
                 Sink::Windiag { .. } => {}
                 Sink::EventLog { .. } => {}
                 Sink::Nats { ref mut url, .. } => {
-                    ui.horizontal(|ui| {
-                        ui.label("Url");
-                        ui.text_edit_singleline(url);
-                    });
+                    text_edit_labeled(ui, "Url", url, None);
                 }
             }
         }
@@ -594,7 +711,7 @@ fn versions_row(
                 ui.strong("Downloading...");
             }
             DownloadStatus::Error => {
-                error_label(ui, "Download Failed");
+                error_label(ui, "Download failed");
                 if ui.button("⬇  Retry ").clicked() {
                     download_clicked(frame, state, &file_info);
                 }
@@ -629,15 +746,23 @@ fn download_clicked(frame: &mut epi::Frame<'_>, state: &mut VersionsState, file_
     }
 }
 
-fn text_edit_labeled(ui: &mut Ui, label: &str, file_name: &mut String) {
+fn text_edit_labeled(ui: &mut Ui, label: &str, content: &mut String, hint_text: Option<&str>) {
     ui.horizontal(|ui| {
         ui.label(label);
-        ui.text_edit_singleline(file_name);
+        let mut editor = egui::TextEdit::singleline(content);
+        if let Some(hint_text) = hint_text {
+            editor = editor.hint_text(hint_text);
+        }
+        ui.add(editor);
     });
 }
 
 fn error_label(ui: &mut Ui, label: &str) {
     ui.colored_label(egui::Color32::from_rgb(255, 0, 0), label);
+}
+
+fn warning_label(ui: &mut Ui, label: &str) {
+    ui.colored_label(egui::Color32::from_rgb(255, 255, 0), format!("⚠ {}", label));
 }
 
 fn copyable_path(ui: &mut Ui, path: &Path) {

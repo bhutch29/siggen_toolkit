@@ -47,6 +47,28 @@ impl FilterOptions {
     }
 }
 
+#[derive(Default)]
+pub struct ReportsState {
+    pub name: String,
+    pub previous_name: String,
+    pub log_file_path: Option<PathBuf>,
+    pub log_cfg_path: Option<PathBuf>,
+    pub hwconfig_path: Option<PathBuf>,
+    pub installed_version: Option<String>,
+    pub generate_status: Option<bool>,
+    pub file_exists: bool,
+}
+
+impl ReportsState {
+    pub fn name_changed(&mut self) -> bool {
+        if self.previous_name != self.name {
+            self.previous_name = self.name.clone();
+            return true;
+        }
+        false
+    }
+}
+
 #[derive(Default, Clone)]
 pub struct VersionsFilter {
     pub options: FilterOptions,

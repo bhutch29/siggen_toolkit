@@ -250,15 +250,14 @@ impl VersionsClient {
                     .map(|s| s.to_string())
                     .collect();
 
-                let (version, date) = (split.pop_front(), split.pop_front());
-
-                match (version, date) {
-                    (Some(version), Some(date)) => Some(FileInfo {
+                if let (Some(version), Some(date)) = (split.pop_front(), split.pop_front()) {
+                    Some(FileInfo {
                         full_name,
                         version,
                         date,
-                    }),
-                    (_, _) => None,
+                    })
+                } else {
+                    None
                 }
             })
             .collect()

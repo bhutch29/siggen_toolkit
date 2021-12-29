@@ -2,6 +2,7 @@ use crate::events;
 use crate::hwconfig;
 use crate::logging;
 use crate::report;
+use std::path::Path;
 pub use structopt::StructOpt;
 use strum::Display;
 
@@ -122,9 +123,16 @@ pub fn run(command: Command) -> anyhow::Result<()> {
         Command::Report(cmd) => match cmd {
             ReportCommand::Download { .. } => {}
             ReportCommand::Zip { name, force } => {
-                let file_name = report::zip_file_name(&name, force)?;
+                let file_name = report::zip_file_name(&name);
+                if !force && Path::new(&file_name).exists() {
+                    return Err(anyhow::anyhow!(
+                        "Destination file already exists: {}\n\
+                         Consider using the --force flag or using a unique name.",
+                        file_name
+                    ));
+                }
                 println!("File Name: {}", file_name);
-                report::create_report(&file_name)?;
+                report::create_report(&name)?;
             }
             ReportCommand::Upload { .. } => {}
             ReportCommand::List { .. } => {}
