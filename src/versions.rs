@@ -2,7 +2,7 @@ use eframe::epi::RepaintSignal;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::VecDeque;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -54,8 +54,14 @@ pub struct FileInfo {
 #[derive(PartialEq, Clone)]
 pub enum DownloadStatus {
     Idle,
-    Downloading,
+    InProgress,
     Error,
+}
+
+impl Default for DownloadStatus {
+    fn default() -> Self {
+        Self::Idle
+    }
 }
 
 #[derive(Debug, Default, PartialEq)]
@@ -218,17 +224,47 @@ impl VersionsClient {
         let client = self.client.clone();
         std::thread::spawn(move || {
             {
-                let mut status_lock = status.lock().unwrap();
-                *status_lock = DownloadStatus::Downloading;
+                *status.lock().unwrap() = DownloadStatus::InProgress;
             }
             match download_internal(&client, &url, &destination_dir, &file_name) {
                 Ok(_) => {
-                    let mut status_lock = status.lock().unwrap();
-                    *status_lock = DownloadStatus::Idle;
+                    *status.lock().unwrap() = DownloadStatus::Idle;
                 }
                 Err(_) => {
-                    let mut status_lock = status.lock().unwrap();
-                    *status_lock = DownloadStatus::Error;
+                    *status.lock().unwrap() = DownloadStatus::Error;
+                }
+            }
+            repaint.request_repaint();
+        });
+
+        Ok(())
+    }
+
+    pub fn upload_report(
+        &self,
+        path: &Path,
+        status: Arc<Mutex<DownloadStatus>>,
+        repaint: Arc<dyn RepaintSignal>,
+    ) -> anyhow::Result<()> {
+        let url = format!(
+            "{}/{}/{}",
+            BASE_DOWNLOAD_URL,
+            report_segments(),
+            path.file_name().unwrap().to_string_lossy()
+        );
+
+        let client = self.client.clone();
+        let path = PathBuf::from(path);
+        std::thread::spawn(move || {
+            {
+                *status.lock().unwrap() = DownloadStatus::InProgress;
+            }
+            match upload_report_internal(&client, &url, &path) {
+                Ok(_) => {
+                    *status.lock().unwrap() = DownloadStatus::Idle;
+                }
+                Err(_) => {
+                    *status.lock().unwrap() = DownloadStatus::Error;
                 }
             }
             repaint.request_repaint();
@@ -332,6 +368,16 @@ fn download_internal(
     Ok(())
 }
 
+fn upload_report_internal(
+    client: &Arc<reqwest::blocking::Client>,
+    url: &String,
+    path: &Path,
+) -> anyhow::Result<()> {
+    let file = std::fs::File::open(path)?;
+    client.put(url).body(file).send()?.error_for_status()?;
+    Ok(())
+}
+
 pub fn installed_version() -> Option<String> {
     //TODO:
     None
@@ -351,6 +397,10 @@ pub fn package_segments() -> String {
 
 pub fn installer_segments() -> String {
     "generic-local-boxer-releases/siggen".to_string()
+}
+
+pub fn report_segments() -> String {
+    "generic-local-pwsg/siggen/reports".to_string()
 }
 
 pub fn develop_branch() -> String {

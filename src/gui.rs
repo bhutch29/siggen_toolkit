@@ -4,8 +4,8 @@ use crate::gui_state::{
     VersionsTypes,
 };
 use crate::logging::{Bool, Level, Logger, Sink};
-use crate::versions::{installed_version, DownloadStatus, FileInfo};
-use crate::{common, hwconfig, logging, report};
+use crate::versions::{DownloadStatus, FileInfo};
+use crate::{common, hwconfig, logging, report, versions};
 use clipboard::ClipboardProvider;
 use eframe::{egui, egui::Ui, epi};
 use std::collections::BTreeMap;
@@ -100,7 +100,7 @@ impl epi::App for GuiApp {
                     self.events(ui);
                 }
                 Some(Tabs::Reports) => {
-                    self.report(ui);
+                    self.report(ui, frame);
                 }
                 None => {
                     about(ui);
@@ -143,7 +143,7 @@ impl GuiApp {
         }
     }
 
-    fn report(&mut self, ui: &mut Ui) {
+    fn report(&mut self, ui: &mut Ui, frame: &mut epi::Frame<'_>) {
         ui.heading("Reports");
         ui.separator();
 
@@ -154,7 +154,7 @@ impl GuiApp {
             Some("Descriptive name for report .zip file. Required."),
         );
         let file_name = report::zip_file_name(&self.reports.name);
-        let file_path = Path::new(&file_name);
+        let file_path = in_cwd(&file_name);
 
         if self.reports.name_changed() {
             self.reports.generate_status = None;
@@ -163,7 +163,7 @@ impl GuiApp {
 
         let empty_name = self.reports.name.is_empty();
         ui.add_enabled_ui(!empty_name, |ui| {
-            copyable_path(ui, &in_cwd(file_path));
+            copyable_path(ui, &file_path);
         });
 
         ui.horizontal(|ui| {
@@ -197,6 +197,22 @@ impl GuiApp {
                 _ => {}
             }
         });
+
+        match *self.reports.upload_status.lock().unwrap() {
+            DownloadStatus::Idle => {}
+            DownloadStatus::InProgress => {}
+            DownloadStatus::Error => {}
+        }
+
+        if ui.button("Upload").clicked() {
+            if self.packages.client.upload_report(
+                &file_path,
+                self.reports.upload_status.clone(),
+                frame.repaint_signal().clone(),
+            ).is_err() {
+                *self.reports.upload_status.lock().unwrap() = DownloadStatus::Error;
+            }
+        }
 
         ui.separator();
         ui.horizontal(|ui| {
@@ -262,7 +278,7 @@ impl GuiApp {
 
         self.reports.log_cfg_path = logging::get_path();
         self.reports.hwconfig_path = hwconfig::get_path();
-        self.reports.installed_version = installed_version();
+        self.reports.installed_version = versions::installed_version();
 
         self.reports.generate_status = None;
     }
@@ -712,7 +728,7 @@ fn versions_row(
             format!("({})", file_info.date)
         ));
         match state.get_package_download_status(file_info) {
-            DownloadStatus::Downloading => {
+            DownloadStatus::InProgress => {
                 ui.strong("Downloading...");
             }
             DownloadStatus::Error => {
@@ -740,14 +756,13 @@ fn download_clicked(frame: &mut epi::Frame<'_>, state: &mut VersionsState, file_
             DownloadStatus::Idle,
         )));
 
-    if let Err(_) = state.client.download_package(
+    if state.client.download_package(
         &state.selected_branch,
         &file_info.full_name,
         status.clone(),
         frame.repaint_signal().clone(),
-    ) {
-        let mut status_lock = status.lock().unwrap();
-        *status_lock = DownloadStatus::Error;
+    ).is_err() {
+        *status.lock().unwrap() = DownloadStatus::Error;
     }
 }
 
