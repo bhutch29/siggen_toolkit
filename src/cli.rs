@@ -1,6 +1,7 @@
 use crate::events;
 use crate::hwconfig;
 use crate::logging;
+use crate::report;
 pub use structopt::StructOpt;
 use strum::Display;
 
@@ -30,11 +31,16 @@ pub enum Command {
 pub enum LogCommand {
     Show {},
     Paths,
+    SinkPath,
 }
 
 #[derive(StructOpt, Debug)]
 pub enum ReportCommand {
-    Zip {},
+    Zip {
+        name: String,
+        #[structopt(short, long, about = "Overwrite file if necessary.")]
+        force: bool,
+    },
     Upload {
         // need to be separate or just have it upload as part of Zip?
     },
@@ -84,9 +90,9 @@ pub fn run(command: Command) -> anyhow::Result<()> {
             HwConfigCommand::Set {
                 config,
                 channel_count,
-            } => hwconfig::set(&hwconfig::get_path(), config, channel_count)?,
+            } => hwconfig::set(&hwconfig::get_path_or_cwd(), config, channel_count)?,
             HwConfigCommand::Restore => println!("Not yet implemented!"),
-            HwConfigCommand::Show => match hwconfig::read_from(&hwconfig::get_path()) {
+            HwConfigCommand::Show => match hwconfig::read_from(&hwconfig::get_path_or_cwd()) {
                 Some(text) => {
                     println!("{}", text)
                 }
@@ -109,10 +115,17 @@ pub fn run(command: Command) -> anyhow::Result<()> {
                     println!("{} {}", path.display(), path.exists())
                 }
             }
+            LogCommand::SinkPath => {
+                println!("{}", logging::get_log_path().display());
+            }
         },
         Command::Report(cmd) => match cmd {
             ReportCommand::Download { .. } => {}
-            ReportCommand::Zip { .. } => {}
+            ReportCommand::Zip { name, force } => {
+                let file_name = report::zip_file_name(&name, force)?;
+                println!("File Name: {}", file_name);
+                report::create_report(&file_name)?;
+            }
             ReportCommand::Upload { .. } => {}
             ReportCommand::List { .. } => {}
         },

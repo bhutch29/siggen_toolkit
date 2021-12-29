@@ -5,6 +5,7 @@ mod gui;
 mod gui_state;
 mod hwconfig;
 mod logging;
+mod report;
 mod versions;
 
 use cli::*;
@@ -15,6 +16,7 @@ fn main() -> anyhow::Result<()> {
     if cfg!(debug_assertions) {
         println!("Parsed Arguments:");
         println!("{:?}", &args);
+        println!();
     }
 
     match args.command {

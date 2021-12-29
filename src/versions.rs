@@ -211,7 +211,7 @@ impl VersionsClient {
         );
 
         let destination_dir = dirs::download_dir().unwrap_or(dirs::home_dir().ok_or(
-            anyhow::anyhow!("Could not find Downloads or Home directories")
+            anyhow::anyhow!("Could not find Downloads or Home directories"),
         )?);
 
         let file_name = file_name.clone();
@@ -331,6 +331,11 @@ fn download_internal(
         .error_for_status()?
         .copy_to(&mut out)?;
     Ok(())
+}
+
+pub fn installed_version() -> Option<String> {
+    //TODO:
+    None
 }
 
 pub fn package_segments() -> String {

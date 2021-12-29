@@ -1,6 +1,6 @@
 use crate::cli;
 use crate::common::*;
-use std::path::{PathBuf, Path};
+use std::path::{Path, PathBuf};
 
 fn serialize_channel(channel: &cli::SimulatedChannel) -> String {
     match channel {
@@ -22,13 +22,17 @@ pub fn serialize_hwconfig(config: cli::SimulatedChannel, channel_count: u8) -> S
     serialize_channels(vec![config; channel_count as usize])
 }
 
-pub fn get_path() -> PathBuf {
+pub fn get_path() -> Option<PathBuf> {
     for path in valid_paths() {
         if path.exists() {
-            return path;
+            return Some(path);
         }
     }
-    in_cwd(FILE_NAME)
+    None
+}
+
+pub fn get_path_or_cwd() -> PathBuf {
+    get_path().unwrap_or(in_cwd(FILE_NAME))
 }
 
 pub fn valid_paths() -> Vec<PathBuf> {
@@ -40,15 +44,13 @@ pub fn valid_paths() -> Vec<PathBuf> {
     }
     .into_iter()
     .filter_map(|x| x)
-    .map(|x| {
-        x.join("Keysight/PathWave/SignalGenerator")
-            .join(FILE_NAME)
-    })
+    .map(|x| x.join(PW_FOLDERS).join(FILE_NAME))
     .collect()
 }
 
 pub fn set(path: &Path, config: cli::SimulatedChannel, channel_count: u8) -> anyhow::Result<()> {
-    std::fs::create_dir_all(path.parent().unwrap()).and_then(|_| std::fs::write(path, &serialize_hwconfig(config, channel_count)))?;
+    std::fs::create_dir_all(path.parent().unwrap())
+        .and_then(|_| std::fs::write(path, &serialize_hwconfig(config, channel_count)))?;
     Ok(())
 }
 

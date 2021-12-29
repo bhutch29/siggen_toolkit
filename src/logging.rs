@@ -1,7 +1,7 @@
 use crate::common::*;
 use dirs;
 use serde::{Deserialize, Serialize};
-use std::path::{PathBuf, Path};
+use std::path::{Path, PathBuf};
 use strum::{Display, EnumIter};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -159,13 +159,17 @@ impl Default for Level {
     }
 }
 
-pub fn get_path() -> PathBuf {
+pub fn get_path() -> Option<PathBuf> {
     for path in valid_paths() {
         if path.exists() {
-            return path;
+            return Some(path);
         }
     }
-    in_cwd(FILE_NAME)
+    None
+}
+
+pub fn get_path_or_cwd() -> PathBuf {
+    get_path().unwrap_or(in_cwd(FILE_NAME))
 }
 
 pub fn valid_paths() -> Vec<PathBuf> {
@@ -176,16 +180,14 @@ pub fn valid_paths() -> Vec<PathBuf> {
     }
     .into_iter()
     .filter_map(|x| x)
-    .map(|x| {
-        x.join("Keysight/PathWave/SignalGenerator")
-            .join(FILE_NAME)
-    })
+    .map(|x| x.join(PW_FOLDERS).join(FILE_NAME))
     .collect()
 }
 
-pub fn get_config_from(path: &Path) -> LoggingConfiguration {
-    let contents = std::fs::read_to_string(path).unwrap_or_default();
-    serde_json::from_str(&contents).unwrap_or_default()
+pub fn get_config_from(path: &Path) -> Option<LoggingConfiguration> {
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|contents| serde_json::from_str(&contents).ok())
 }
 
 pub fn set_config(path: &Path, config: LoggingConfiguration) -> anyhow::Result<()> {
@@ -193,10 +195,23 @@ pub fn set_config(path: &Path, config: LoggingConfiguration) -> anyhow::Result<(
     Ok(())
 }
 
+pub fn get_log_path() -> PathBuf {
+    get_config_from(&get_path_or_cwd())
+        .and_then(|config| {
+            config.sinks.iter().find_map(|sink| match sink {
+                Sink::File { file_name, .. }
+                | Sink::DailyFile { file_name, .. }
+                | Sink::RotatingFile { file_name, .. } => Some(PathBuf::from(file_name)),
+                _ => None,
+            })
+        })
+        .unwrap_or(PathBuf::from(CODE_DEFINED_LOG_PATH))
+}
+
 pub fn show() -> anyhow::Result<()> {
     println!(
         "{}",
-        serde_json::to_string_pretty(&get_config_from(&get_path()))?
+        serde_json::to_string_pretty(&get_config_from(&get_path_or_cwd()))?
     );
     Ok(())
 }
@@ -210,3 +225,9 @@ pub fn remove_invalid_sinks(logger: &mut Logger, sinks: &Vec<Sink>) {
 }
 
 pub const FILE_NAME: &str = "ksflogger.cfg";
+
+#[cfg(target_os = "windows")]
+const CODE_DEFINED_LOG_PATH: &str = r"C:\Temp\Keysight.PathWave.SG.log";
+
+#[cfg(not(target_os = "windows"))]
+const CODE_DEFINED_LOG_PATH: &str = "/tmp/Keysight.PathWave.SG.log";

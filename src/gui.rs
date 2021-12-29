@@ -8,13 +8,13 @@ use crate::{common, hwconfig, logging};
 use clipboard::ClipboardProvider;
 use eframe::{egui, egui::Ui, epi};
 use std::collections::BTreeMap;
-use std::path::{PathBuf, Path};
+use std::path::{Path, PathBuf};
 use strum::{Display, EnumIter, IntoEnumIterator};
 
 enum SinksAction {
     Remove(usize),
     Enable(String),
-    Disable(String)
+    Disable(String),
 }
 
 #[derive(PartialEq, Clone, Copy, EnumIter, Display)]
@@ -25,6 +25,7 @@ enum Tabs {
     Packages,
     Installers,
     Events,
+    Report,
 }
 
 struct GuiApp {
@@ -89,11 +90,13 @@ impl epi::App for GuiApp {
                     versions(ui, frame, &mut self.packages);
                 }
                 Some(Tabs::Installers) => {
-                    // TODO: Need Artifactory read permissions
-                    // versions(ui, frame, &mut self.installers);
+                    versions(ui, frame, &mut self.installers);
                 }
                 Some(Tabs::Events) => {
                     self.events(ui);
+                }
+                Some(Tabs::Report) => {
+                    // TODO
                 }
                 None => {
                     about(ui);
@@ -108,8 +111,9 @@ impl epi::App for GuiApp {
         _frame: &mut epi::Frame<'_>,
         _storage: Option<&dyn epi::Storage>,
     ) {
-        self.logger.config = logging::get_config_from(&logging::get_path());
-        self.logger.loaded_from = Some(logging::get_path());
+        self.logger.config =
+            logging::get_config_from(&logging::get_path_or_cwd()).unwrap_or_default();
+        self.logger.loaded_from = Some(logging::get_path_or_cwd());
     }
 
     fn name(&self) -> &str {
@@ -138,7 +142,7 @@ impl GuiApp {
         ui.heading("Events");
         ui.separator();
         if !cfg!(windows) {
-            ui.label("Events is only supported on Windows.");
+            ui.label("Event Log is only supported on Windows.");
         } else {
             // TODO
         }
@@ -326,7 +330,7 @@ impl GuiApp {
 
         let exists = path.exists() && path.is_file();
         if ui.add_enabled(exists, egui::Button::new("Load")).clicked() {
-            self.logger.config = logging::get_config_from(&path);
+            self.logger.config = logging::get_config_from(&path).unwrap_or_default();
             self.logger.loaded_from = Some(path.clone());
         }
         if ui.button("Save").clicked() {
@@ -610,7 +614,9 @@ fn download_clicked(frame: &mut epi::Frame<'_>, state: &mut VersionsState, file_
     let status = state
         .status
         .entry((state.selected_branch.clone(), file_info.clone()))
-        .or_insert(std::sync::Arc::from(std::sync::Mutex::from(DownloadStatus::Idle)));
+        .or_insert(std::sync::Arc::from(std::sync::Mutex::from(
+            DownloadStatus::Idle,
+        )));
 
     if let Err(_) = state.client.download_package(
         &state.selected_branch,
