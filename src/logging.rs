@@ -3,7 +3,7 @@ use anyhow::Result;
 use dirs;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 use strum::{Display, EnumIter};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -185,12 +185,12 @@ pub fn valid_paths() -> Vec<PathBuf> {
     .collect()
 }
 
-pub fn get_config_from(path: &PathBuf) -> LoggingConfiguration {
+pub fn get_config_from(path: &Path) -> LoggingConfiguration {
     let contents = fs::read_to_string(path).unwrap_or_default();
     serde_json::from_str(&contents).unwrap_or_default()
 }
 
-pub fn set_config(path: &PathBuf, config: LoggingConfiguration) -> Result<()> {
+pub fn set_config(path: &Path, config: LoggingConfiguration) -> Result<()> {
     fs::write(path, serde_json::to_string_pretty(&config)?)?;
     Ok(())
 }

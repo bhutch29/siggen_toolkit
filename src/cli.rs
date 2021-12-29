@@ -1,3 +1,6 @@
+use crate::events;
+use crate::hwconfig;
+use crate::logging;
 pub use structopt::StructOpt;
 use strum::Display;
 
@@ -8,7 +11,7 @@ use strum::Display;
 )]
 pub struct Sgt {
     #[structopt(subcommand)]
-    pub cmd: Option<Command>,
+    pub command: Option<Command>,
 }
 
 #[derive(StructOpt, Debug)]
@@ -17,8 +20,6 @@ pub enum Command {
     HwConfig(HwConfigCommand),
     #[structopt(about = "Logging configuration.")]
     Log(LogCommand),
-    #[structopt(name = "siggen", about = "Download or run application versions.")]
-    SigGen(SigGenCommand),
     #[structopt(about = "Create or browse reports.")]
     Report(ReportCommand),
     #[structopt(about = "Windows Event Log viewing.")]
@@ -39,13 +40,6 @@ pub enum ReportCommand {
     },
     List {},
     Download {},
-}
-
-#[derive(StructOpt, Debug)]
-pub enum SigGenCommand {
-    Download { version: String },
-    List,
-    Run {},
 }
 
 #[derive(StructOpt, Debug)]
@@ -82,4 +76,51 @@ impl Default for SimulatedChannel {
     fn default() -> Self {
         Self::MCS31 { signal_count: 1 }
     }
+}
+
+pub fn run(command: Command) -> anyhow::Result<()> {
+    match command {
+        Command::HwConfig(cmd) => match cmd {
+            HwConfigCommand::Set {
+                config,
+                channel_count,
+            } => hwconfig::set(&hwconfig::get_path(), config, channel_count)?,
+            HwConfigCommand::Restore => println!("Not yet implemented!"),
+            HwConfigCommand::Show => match hwconfig::read_from(&hwconfig::get_path()) {
+                Some(text) => {
+                    println!("{}", text)
+                }
+                None => {
+                    println!("No hwconfig found")
+                }
+            },
+            HwConfigCommand::Paths => {
+                for path in hwconfig::valid_paths() {
+                    println!("{} {}", path.display(), path.exists())
+                }
+            }
+        },
+        Command::Log(cmd) => match cmd {
+            LogCommand::Show { .. } => {
+                logging::show()?;
+            }
+            LogCommand::Paths => {
+                for path in logging::valid_paths() {
+                    println!("{} {}", path.display(), path.exists())
+                }
+            }
+        },
+        Command::Report(cmd) => match cmd {
+            ReportCommand::Download { .. } => {}
+            ReportCommand::Zip { .. } => {}
+            ReportCommand::Upload { .. } => {}
+            ReportCommand::List { .. } => {}
+        },
+        Command::Events(cmd) => match cmd {
+            EventsCommand::List { .. } => {
+                events::event_stuff();
+            }
+        },
+    };
+    Ok(())
 }

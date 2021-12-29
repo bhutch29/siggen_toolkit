@@ -9,9 +9,15 @@ use clipboard::ClipboardProvider;
 use eframe::{egui, egui::Ui, epi};
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 use std::sync;
 use strum::{Display, EnumIter, IntoEnumIterator};
+
+enum SinksAction {
+    Remove(usize),
+    Enable(String),
+    Disable(String)
+}
 
 #[derive(PartialEq, Clone, Copy, EnumIter, Display)]
 enum Tabs {
@@ -19,7 +25,8 @@ enum Tabs {
     #[strum(serialize = "Hardware Configuration")]
     HwConfig,
     Packages,
-    // Installers,
+    Installers,
+    Events,
 }
 
 struct GuiApp {
@@ -33,12 +40,7 @@ struct GuiApp {
 impl Default for GuiApp {
     fn default() -> Self {
         Self {
-            hwconfig: HwconfigState {
-                channel_count: 1,
-                platform: SimulatedChannel::MCS31 { signal_count: 1 },
-                write_error: false,
-                remove_error: false,
-            },
+            hwconfig: Default::default(),
             logger: Default::default(),
             packages: VersionsState::new(VersionsTypes::Packages),
             installers: VersionsState::new(VersionsTypes::Installers),
@@ -88,9 +90,13 @@ impl epi::App for GuiApp {
                 Some(Tabs::Packages) => {
                     versions(ui, frame, &mut self.packages);
                 }
-                // Tabs::Installers => {
-                //     versions(ui, frame, &mut self.installers);
-                // }
+                Some(Tabs::Installers) => {
+                    // TODO: Need Artifactory read permissions
+                    // versions(ui, frame, &mut self.installers);
+                }
+                Some(Tabs::Events) => {
+                    self.events(ui);
+                }
                 None => {
                     about(ui);
                 }
@@ -130,6 +136,16 @@ impl GuiApp {
         }
     }
 
+    fn events(&mut self, ui: &mut Ui) {
+        ui.heading("Events");
+        ui.separator();
+        if !cfg!(windows) {
+            ui.label("Events is only supported on Windows.");
+        } else {
+            // TODO
+        }
+    }
+
     fn hwconfig(&mut self, ui: &mut Ui) {
         ui.heading("Hardware Configuration");
         ui.separator();
@@ -156,14 +172,14 @@ impl GuiApp {
         );
     }
 
-    fn hwconfig_path(&mut self, ui: &mut Ui, path: &PathBuf) {
+    fn hwconfig_path(&mut self, ui: &mut Ui, path: &Path) {
         ui.horizontal(|ui| {
             copyable_path(ui, path);
             self.hwconfig_path_buttons(ui, path);
         });
     }
 
-    fn hwconfig_path_buttons(&mut self, ui: &mut Ui, path: &PathBuf) {
+    fn hwconfig_path_buttons(&mut self, ui: &mut Ui, path: &Path) {
         if ui.button("Save").clicked() {
             self.hwconfig.write_error =
                 hwconfig::set(path, self.hwconfig.platform, self.hwconfig.channel_count).is_err();
@@ -239,7 +255,7 @@ impl GuiApp {
         ui.strong("Custom:");
         ui.horizontal(|ui| {
             ui.text_edit_singleline(&mut self.logger.custom_path);
-            self.logging_path_buttons(ui, &PathBuf::from(&self.logger.custom_path));
+            self.logging_path_buttons(ui, PathBuf::from(&self.logger.custom_path));
         });
         ui.separator();
 
@@ -257,22 +273,22 @@ impl GuiApp {
             egui::ScrollArea::vertical()
                 .id_source("scroll_sinks")
                 .show(&mut columns[0], |ui| {
-                    let (sinks_to_remove, sinks_to_add_to_loggers, sinks_to_remove_from_loggers) =
-                        self.sinks(ui);
+                    let action = self.sinks(ui);
 
-                    for index in sinks_to_remove {
-                        self.logger.config.sinks.remove(index);
-                    }
-
-                    for sink in sinks_to_add_to_loggers {
-                        for logger in self.logger.config.loggers.iter_mut() {
-                            logger.sinks.push(sink.clone());
+                    match action {
+                        None => {}
+                        Some(SinksAction::Remove(index)) => {
+                            self.logger.config.sinks.remove(index);
                         }
-                    }
-
-                    for sink in sinks_to_remove_from_loggers {
-                        for logger in self.logger.config.loggers.iter_mut() {
-                            logger.sinks.retain(|s| s != &sink);
+                        Some(SinksAction::Enable(sink)) => {
+                            for logger in self.logger.config.loggers.iter_mut() {
+                                logger.sinks.push(sink.clone());
+                            }
+                        }
+                        Some(SinksAction::Disable(sink)) => {
+                            for logger in self.logger.config.loggers.iter_mut() {
+                                logger.sinks.retain(|s| s != &sink);
+                            }
                         }
                     }
                 });
@@ -296,15 +312,15 @@ impl GuiApp {
         });
     }
 
-    fn logging_path(&mut self, ui: &mut Ui, path: &PathBuf) {
+    fn logging_path(&mut self, ui: &mut Ui, path: &Path) {
         ui.horizontal(|ui| {
             copyable_path(ui, path);
-            self.logging_path_buttons(ui, path);
+            self.logging_path_buttons(ui, PathBuf::from(path));
         });
     }
 
-    fn logging_path_buttons(&mut self, ui: &mut Ui, path: &PathBuf) {
-        ui.label(if Some(path) == self.logger.loaded_from.as_ref() {
+    fn logging_path_buttons(&mut self, ui: &mut Ui, path: PathBuf) {
+        ui.label(if self.logger.loaded_from.as_ref() == Some(&path) {
             "⬅"
         } else {
             "     "
@@ -312,13 +328,13 @@ impl GuiApp {
 
         let exists = path.exists() && path.is_file();
         if ui.add_enabled(exists, egui::Button::new("Load")).clicked() {
-            self.logger.config = logging::get_config_from(path);
+            self.logger.config = logging::get_config_from(&path);
             self.logger.loaded_from = Some(path.clone());
         }
         if ui.button("Save").clicked() {
             self.logger.remove_error = false;
             self.logger.write_error =
-                logging::set_config(path, self.logger.config.clone()).is_err();
+                logging::set_config(&path, self.logger.config.clone()).is_err();
             if !self.logger.write_error {
                 self.logger.loaded_from = Some(path.clone());
             }
@@ -328,8 +344,8 @@ impl GuiApp {
             .clicked()
         {
             self.logger.write_error = false;
-            self.logger.remove_error = fs::remove_file(path).is_err();
-            if Some(path) == self.logger.loaded_from.as_ref() {
+            self.logger.remove_error = fs::remove_file(&path).is_err();
+            if self.logger.loaded_from == Some(path) {
                 self.logger.loaded_from = None;
             }
         }
@@ -358,17 +374,14 @@ impl GuiApp {
         loggers_to_remove
     }
 
-    fn sinks(&mut self, ui: &mut Ui) -> (Vec<usize>, Vec<String>, Vec<String>) {
-        let mut sinks_to_remove = vec![];
-        let mut sinks_to_add_to_loggers = vec![];
-        let mut sinks_to_remove_from_loggers = vec![];
-
+    fn sinks(&mut self, ui: &mut Ui) -> Option<SinksAction> {
+        let mut action = None;
         for (i, sink) in self.logger.config.sinks.iter_mut().enumerate() {
             ui.separator();
 
             ui.horizontal(|ui| {
                 if ui.button(" 🗙 ").on_hover_text("Remove").clicked() {
-                    sinks_to_remove.push(i);
+                    action = Some(SinksAction::Remove(i));
                 }
                 ui.strong(sink.to_string());
                 if ui
@@ -376,14 +389,14 @@ impl GuiApp {
                     .on_hover_text("Enable on all loggers")
                     .clicked()
                 {
-                    sinks_to_add_to_loggers.push(sink.get_name().clone());
+                    action = Some(SinksAction::Enable(sink.get_name().clone()));
                 }
                 if ui
                     .button(" ➖ ")
                     .on_hover_text("Disable on all loggers")
                     .clicked()
                 {
-                    sinks_to_remove_from_loggers.push(sink.get_name().clone());
+                    action = Some(SinksAction::Disable(sink.get_name().clone()));
                 }
             });
 
@@ -455,11 +468,7 @@ impl GuiApp {
                 }
             }
         }
-        (
-            sinks_to_remove,
-            sinks_to_add_to_loggers,
-            sinks_to_remove_from_loggers,
-        )
+        action
     }
 }
 
@@ -627,7 +636,7 @@ fn error_label(ui: &mut Ui, label: &str) {
     ui.colored_label(egui::Color32::from_rgb(255, 0, 0), label);
 }
 
-fn copyable_path(ui: &mut Ui, path: &PathBuf) {
+fn copyable_path(ui: &mut Ui, path: &Path) {
     if ui
         .selectable_label(false, &path.to_string_lossy())
         .on_hover_text("Click to copy")
@@ -702,7 +711,7 @@ fn filter_dropdown(
     });
 }
 
-pub fn run() {
+pub fn run() -> anyhow::Result<()> {
     let app = GuiApp::default();
 
     let icon_bytes = include_bytes!("../keysight-logo.ico");

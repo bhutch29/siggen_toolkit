@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::fs::File;
-use std::path::PathBuf;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -196,23 +196,6 @@ mod tests {
 }
 
 impl VersionsClient {
-    pub fn do_stuff(&self) -> Result<()> {
-        let generic_local_pwsg =
-            "https://artifactory.it.keysight.com/artifactory/api/storage/generic-local-pwsg/siggen";
-        let response = self
-            .client
-            .get(format!("{}/packages-linux/develop", generic_local_pwsg))
-            .send()?;
-        let temp: ArtifactoryDirectory = serde_json::from_str(&response.text()?)?;
-        dbg!(&temp);
-
-        for child in temp.children {
-            println!("{}", child.uri);
-        }
-
-        Ok(())
-    }
-
     // TODO: download to directories by branch
     pub fn download_package(
         &self,
@@ -307,7 +290,7 @@ impl VersionsClient {
     fn get_info(&self, branch: &String, segments: &String) -> Vec<String> {
         VersionsClient::parse_children(
             self.api_request(&format!("{}/{}", segments, branch))
-                .unwrap_or_default()
+                .unwrap_or_default(),
         )
     }
 
@@ -340,7 +323,7 @@ impl VersionsClient {
 fn download_internal(
     client: &Arc<reqwest::blocking::Client>,
     url: &String,
-    destination_dir: &PathBuf,
+    destination_dir: &Path,
     file_name: &String,
 ) -> Result<()> {
     let mut out = File::create(format!("{}/{}", destination_dir.display(), file_name))?;

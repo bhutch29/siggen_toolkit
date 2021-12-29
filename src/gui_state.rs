@@ -15,6 +15,17 @@ pub struct HwconfigState {
     pub remove_error: bool,
 }
 
+impl Default for HwconfigState {
+    fn default() -> Self {
+        Self {
+            channel_count: 1,
+            platform: SimulatedChannel::MCS31 { signal_count: 1 },
+            write_error: false,
+            remove_error: false,
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct LoggingState {
     pub config: LoggingConfiguration,

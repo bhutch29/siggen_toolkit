@@ -2,7 +2,7 @@ use crate::cli;
 use crate::common::*;
 use anyhow::Result;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 
 fn serialize_channel(channel: &cli::SimulatedChannel) -> String {
     match channel {
@@ -49,7 +49,7 @@ pub fn valid_paths() -> Vec<PathBuf> {
     .collect()
 }
 
-pub fn set(path: &PathBuf, config: cli::SimulatedChannel, channel_count: u8) -> Result<()> {
+pub fn set(path: &Path, config: cli::SimulatedChannel, channel_count: u8) -> Result<()> {
     if fs::create_dir_all(path.parent().unwrap()).is_ok() {
         fs::write(path, &serialize_hwconfig(config, channel_count))?;
     }
@@ -61,7 +61,7 @@ pub fn set(path: &PathBuf, config: cli::SimulatedChannel, channel_count: u8) -> 
 //     println!("{}", entry.path().display());
 // }
 
-pub fn read_from(path: &PathBuf) -> Option<String> {
+pub fn read_from(path: &Path) -> Option<String> {
     path.exists()
         .then(|| fs::read_to_string(path).ok())
         .flatten()
