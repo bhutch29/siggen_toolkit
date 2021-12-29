@@ -23,7 +23,7 @@ pub enum Sink {
     File {
         level: Level,
         name: String,
-        file_name: String, // TODO: file_name can be optional
+        file_name: String,
         truncate: Option<Bool>,
     },
     RotatingFile {
