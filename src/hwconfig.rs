@@ -3,6 +3,7 @@ use crate::common::*;
 use anyhow::Result;
 use std::fs;
 use std::path::{PathBuf, Path};
+use std::io::Error;
 
 fn serialize_channel(channel: &cli::SimulatedChannel) -> String {
     match channel {
@@ -13,7 +14,7 @@ fn serialize_channel(channel: &cli::SimulatedChannel) -> String {
     }
 }
 
-fn serialize_channels(channels: &[cli::SimulatedChannel]) -> String {
+fn serialize_channels(channels: Vec<cli::SimulatedChannel>) -> String {
     channels
         .iter()
         .map(|channel| format!("simulated {}\n", serialize_channel(channel)))
@@ -21,7 +22,7 @@ fn serialize_channels(channels: &[cli::SimulatedChannel]) -> String {
 }
 
 pub fn serialize_hwconfig(config: cli::SimulatedChannel, channel_count: u8) -> String {
-    serialize_channels(vec![config; channel_count as usize].as_slice())
+    serialize_channels(vec![config; channel_count as usize])
 }
 
 pub fn get_path() -> PathBuf {
@@ -49,11 +50,8 @@ pub fn valid_paths() -> Vec<PathBuf> {
     .collect()
 }
 
-pub fn set(path: &Path, config: cli::SimulatedChannel, channel_count: u8) -> Result<()> {
-    if fs::create_dir_all(path.parent().unwrap()).is_ok() {
-        fs::write(path, &serialize_hwconfig(config, channel_count))?;
-    }
-    Ok(())
+pub fn set(path: &Path, config: cli::SimulatedChannel, channel_count: u8) -> Result<(), Error> {
+    fs::create_dir_all(path.parent().unwrap()).and_then(|_| fs::write(path, &serialize_hwconfig(config, channel_count)))
 }
 
 // for entry in WalkDir::new("/home/bhutch/projects/siggen_toolkit") {
@@ -62,9 +60,10 @@ pub fn set(path: &Path, config: cli::SimulatedChannel, channel_count: u8) -> Res
 // }
 
 pub fn read_from(path: &Path) -> Option<String> {
-    path.exists()
-        .then(|| fs::read_to_string(path).ok())
-        .flatten()
+    if !path.exists() {
+        return None;
+    }
+    fs::read_to_string(path).ok()
 }
 
 pub fn file_name() -> String {

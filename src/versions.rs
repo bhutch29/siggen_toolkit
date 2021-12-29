@@ -288,7 +288,7 @@ impl VersionsClient {
     }
 
     fn get_info(&self, branch: &String, segments: &String) -> Vec<String> {
-        VersionsClient::parse_children(
+        parse_children(
             self.api_request(&format!("{}/{}", segments, branch))
                 .unwrap_or_default(),
         )
@@ -303,21 +303,21 @@ impl VersionsClient {
     }
 
     fn get_branch_names(&self, segments: &String) -> Vec<String> {
-        VersionsClient::parse_children(self.api_request(segments).unwrap_or_default())
-    }
-
-    fn parse_children(response: ArtifactoryDirectory) -> Vec<String> {
-        response
-            .children
-            .iter()
-            .map(|child| child.uri.trim_start_matches("/").to_string())
-            .collect()
+        parse_children(self.api_request(segments).unwrap_or_default())
     }
 
     fn api_request(&self, segments: &String) -> Option<ArtifactoryDirectory> {
         let request = self.client.get(format!("{}/{}", BASE_API_URL, segments));
         serde_json::from_str(&request.send().ok()?.text().unwrap_or_default()).ok()?
     }
+}
+
+fn parse_children(response: ArtifactoryDirectory) -> Vec<String> {
+    response
+        .children
+        .iter()
+        .map(|child| child.uri.trim_start_matches("/").to_string())
+        .collect()
 }
 
 fn download_internal(

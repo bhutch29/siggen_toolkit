@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{PathBuf, Path};
 use strum::{Display, EnumIter};
+use std::io::Error;
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct LoggingConfiguration {
@@ -190,9 +191,8 @@ pub fn get_config_from(path: &Path) -> LoggingConfiguration {
     serde_json::from_str(&contents).unwrap_or_default()
 }
 
-pub fn set_config(path: &Path, config: LoggingConfiguration) -> Result<()> {
-    fs::write(path, serde_json::to_string_pretty(&config)?)?;
-    Ok(())
+pub fn set_config(path: &Path, config: LoggingConfiguration) -> Result<(), Error> {
+    fs::write(path, serde_json::to_string_pretty(&config)?)
 }
 
 pub fn show() -> Result<()> {
