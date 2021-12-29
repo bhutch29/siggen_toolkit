@@ -1,9 +1,7 @@
 use crate::cli;
 use crate::common::*;
-use anyhow::Result;
 use std::fs;
 use std::path::{PathBuf, Path};
-use std::io::Error;
 
 fn serialize_channel(channel: &cli::SimulatedChannel) -> String {
     match channel {
@@ -50,8 +48,9 @@ pub fn valid_paths() -> Vec<PathBuf> {
     .collect()
 }
 
-pub fn set(path: &Path, config: cli::SimulatedChannel, channel_count: u8) -> Result<(), Error> {
-    fs::create_dir_all(path.parent().unwrap()).and_then(|_| fs::write(path, &serialize_hwconfig(config, channel_count)))
+pub fn set(path: &Path, config: cli::SimulatedChannel, channel_count: u8) -> anyhow::Result<()> {
+    fs::create_dir_all(path.parent().unwrap()).and_then(|_| fs::write(path, &serialize_hwconfig(config, channel_count)))?;
+    Ok(())
 }
 
 // for entry in WalkDir::new("/home/bhutch/projects/siggen_toolkit") {

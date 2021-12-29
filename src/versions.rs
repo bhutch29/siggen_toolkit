@@ -1,4 +1,3 @@
-use anyhow::Result;
 use eframe::epi::RepaintSignal;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -203,7 +202,7 @@ impl VersionsClient {
         file_name: &String,
         status: Arc<Mutex<DownloadStatus>>,
         repaint: Arc<dyn RepaintSignal>,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         let url = format!(
             "{}/{}/{}/{}",
             BASE_DOWNLOAD_URL,
@@ -213,7 +212,7 @@ impl VersionsClient {
         );
 
         let destination_dir = dirs::download_dir().unwrap_or(dirs::home_dir().ok_or(
-            anyhow::Error::msg("Could not find Downloads or Home directories"),
+            anyhow::anyhow!("Could not find Downloads or Home directories")
         )?);
 
         let file_name = file_name.clone();
@@ -325,7 +324,7 @@ fn download_internal(
     url: &String,
     destination_dir: &Path,
     file_name: &String,
-) -> Result<()> {
+) -> anyhow::Result<()> {
     let mut out = File::create(format!("{}/{}", destination_dir.display(), file_name))?;
     client
         .get(url)
