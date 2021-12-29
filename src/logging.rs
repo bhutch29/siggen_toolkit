@@ -1,7 +1,6 @@
 use crate::common::*;
 use dirs;
 use serde::{Deserialize, Serialize};
-use std::fs;
 use std::path::{PathBuf, Path};
 use strum::{Display, EnumIter};
 
@@ -185,12 +184,12 @@ pub fn valid_paths() -> Vec<PathBuf> {
 }
 
 pub fn get_config_from(path: &Path) -> LoggingConfiguration {
-    let contents = fs::read_to_string(path).unwrap_or_default();
+    let contents = std::fs::read_to_string(path).unwrap_or_default();
     serde_json::from_str(&contents).unwrap_or_default()
 }
 
 pub fn set_config(path: &Path, config: LoggingConfiguration) -> anyhow::Result<()> {
-    fs::write(path, serde_json::to_string_pretty(&config)?)?;
+    std::fs::write(path, serde_json::to_string_pretty(&config)?)?;
     Ok(())
 }
 

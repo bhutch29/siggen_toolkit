@@ -1,6 +1,5 @@
 use crate::cli;
 use crate::common::*;
-use std::fs;
 use std::path::{PathBuf, Path};
 
 fn serialize_channel(channel: &cli::SimulatedChannel) -> String {
@@ -49,7 +48,7 @@ pub fn valid_paths() -> Vec<PathBuf> {
 }
 
 pub fn set(path: &Path, config: cli::SimulatedChannel, channel_count: u8) -> anyhow::Result<()> {
-    fs::create_dir_all(path.parent().unwrap()).and_then(|_| fs::write(path, &serialize_hwconfig(config, channel_count)))?;
+    std::fs::create_dir_all(path.parent().unwrap()).and_then(|_| std::fs::write(path, &serialize_hwconfig(config, channel_count)))?;
     Ok(())
 }
 
@@ -62,7 +61,7 @@ pub fn read_from(path: &Path) -> Option<String> {
     if !path.exists() {
         return None;
     }
-    fs::read_to_string(path).ok()
+    std::fs::read_to_string(path).ok()
 }
 
 pub const FILE_NAME: &str = "sghal_dev.cfg";

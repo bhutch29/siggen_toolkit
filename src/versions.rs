@@ -2,7 +2,6 @@ use eframe::epi::RepaintSignal;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::VecDeque;
-use std::fs::File;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -325,7 +324,7 @@ fn download_internal(
     destination_dir: &Path,
     file_name: &String,
 ) -> anyhow::Result<()> {
-    let mut out = File::create(format!("{}/{}", destination_dir.display(), file_name))?;
+    let mut out = std::fs::File::create(format!("{}/{}", destination_dir.display(), file_name))?;
     client
         .get(url)
         .send()?

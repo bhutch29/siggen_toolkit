@@ -8,9 +8,7 @@ use crate::{common, hwconfig, logging};
 use clipboard::ClipboardProvider;
 use eframe::{egui, egui::Ui, epi};
 use std::collections::BTreeMap;
-use std::fs;
 use std::path::{PathBuf, Path};
-use std::sync;
 use strum::{Display, EnumIter, IntoEnumIterator};
 
 enum SinksAction {
@@ -190,7 +188,7 @@ impl GuiApp {
             .clicked()
         {
             self.hwconfig.write_error = false;
-            self.hwconfig.remove_error = fs::remove_file(path).is_err();
+            self.hwconfig.remove_error = std::fs::remove_file(path).is_err();
         }
 
         if self.hwconfig.write_error {
@@ -344,7 +342,7 @@ impl GuiApp {
             .clicked()
         {
             self.logger.write_error = false;
-            self.logger.remove_error = fs::remove_file(&path).is_err();
+            self.logger.remove_error = std::fs::remove_file(&path).is_err();
             if self.logger.loaded_from == Some(path) {
                 self.logger.loaded_from = None;
             }
@@ -612,7 +610,7 @@ fn download_clicked(frame: &mut epi::Frame<'_>, state: &mut VersionsState, file_
     let status = state
         .status
         .entry((state.selected_branch.clone(), file_info.clone()))
-        .or_insert(sync::Arc::from(sync::Mutex::from(DownloadStatus::Idle)));
+        .or_insert(std::sync::Arc::from(std::sync::Mutex::from(DownloadStatus::Idle)));
 
     if let Err(_) = state.client.download_package(
         &state.selected_branch,
