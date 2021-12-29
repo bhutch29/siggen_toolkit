@@ -29,7 +29,7 @@ pub fn get_path() -> PathBuf {
             return path;
         }
     }
-    in_cwd(file_name())
+    in_cwd(FILE_NAME)
 }
 
 pub fn valid_paths() -> Vec<PathBuf> {
@@ -43,7 +43,7 @@ pub fn valid_paths() -> Vec<PathBuf> {
     .filter_map(|x| x)
     .map(|x| {
         x.join("Keysight/PathWave/SignalGenerator")
-            .join(file_name())
+            .join(FILE_NAME)
     })
     .collect()
 }
@@ -65,6 +65,4 @@ pub fn read_from(path: &Path) -> Option<String> {
     fs::read_to_string(path).ok()
 }
 
-pub fn file_name() -> String {
-    "sghal_dev.cfg".to_string()
-}
+pub const FILE_NAME: &str = "sghal_dev.cfg";

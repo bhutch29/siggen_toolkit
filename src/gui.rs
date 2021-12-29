@@ -154,7 +154,7 @@ impl GuiApp {
             self.hwconfig_path(ui, path);
         }
         ui.strong("Current working directory:");
-        self.hwconfig_path(ui, &common::in_cwd(hwconfig::file_name()));
+        self.hwconfig_path(ui, &common::in_cwd(hwconfig::FILE_NAME));
         ui.separator();
 
         ui.heading("Simulated Hardware Configuration");
@@ -251,7 +251,7 @@ impl GuiApp {
             self.logging_path(ui, path);
         }
         ui.strong("Current working directory:");
-        self.logging_path(ui, &common::in_cwd(logging::file_name()));
+        self.logging_path(ui, &common::in_cwd(logging::FILE_NAME));
         ui.strong("Custom:");
         ui.horizontal(|ui| {
             ui.text_edit_singleline(&mut self.logger.custom_path);

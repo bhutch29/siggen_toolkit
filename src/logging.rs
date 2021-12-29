@@ -166,7 +166,7 @@ pub fn get_path() -> PathBuf {
             return path;
         }
     }
-    in_cwd(file_name())
+    in_cwd(FILE_NAME)
 }
 
 pub fn valid_paths() -> Vec<PathBuf> {
@@ -179,7 +179,7 @@ pub fn valid_paths() -> Vec<PathBuf> {
     .filter_map(|x| x)
     .map(|x| {
         x.join("Keysight/PathWave/SignalGenerator")
-            .join(file_name())
+            .join(FILE_NAME)
     })
     .collect()
 }
@@ -202,10 +202,6 @@ pub fn show() -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn file_name() -> String {
-    "ksflogger.cfg".to_string()
-}
-
 pub fn remove_invalid_sinks(logger: &mut Logger, sinks: &Vec<Sink>) {
     logger.sinks.retain(|logger_sink_name| {
         sinks
@@ -213,3 +209,5 @@ pub fn remove_invalid_sinks(logger: &mut Logger, sinks: &Vec<Sink>) {
             .any(|target_sink| target_sink.get_name() == logger_sink_name)
     });
 }
+
+pub const FILE_NAME: &str = "ksflogger.cfg";
