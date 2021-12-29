@@ -11,6 +11,7 @@ use eframe::{egui, egui::Ui, epi};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use strum::{Display, EnumIter, IntoEnumIterator};
+use crate::common::in_cwd;
 
 enum SinksAction {
     Remove(usize),
@@ -153,41 +154,45 @@ impl GuiApp {
             Some("Descriptive name for report .zip file. Required."),
         );
         let file_name = report::zip_file_name(&self.reports.name);
+        let file_path = Path::new(&file_name);
 
         if self.reports.name_changed() {
             self.reports.generate_status = None;
-            self.reports.file_exists = Path::new(&file_name).exists();
+            self.reports.file_exists = file_path.exists();
         }
 
+        let empty_name = self.reports.name.is_empty();
+        ui.add_enabled_ui(!empty_name, |ui| {
+            copyable_path(ui, &in_cwd(file_path));
+        });
+
         ui.horizontal(|ui| {
-            let empty_name = self.reports.name.is_empty();
-            ui.add_enabled_ui(!empty_name && self.reports.generate_status != Some(true), |ui| {
-                if ui.button("Generate Report").clicked() {
-                    self.reports.generate_status = match report::create_report(&self.reports.name) {
-                        Ok(_) => Some(true),
-                        Err(_) => Some(false),
-                    };
-                    self.reports.file_exists = Path::new(&file_name).exists();
-                }
-            });
+            ui.add_enabled_ui(
+                !empty_name && self.reports.generate_status != Some(true),
+                |ui| {
+                    if ui.button("Generate Report").clicked() {
+                        self.reports.generate_status =
+                            match report::create_report(&self.reports.name) {
+                                Ok(_) => Some(true),
+                                Err(_) => Some(false),
+                            };
+                        self.reports.file_exists = file_path.exists();
+                    }
+                },
+            );
 
             match self.reports.generate_status {
                 Some(false) if !self.reports.file_exists => {
                     error_label(ui, "Generation failed");
                 }
                 Some(false) => {
-                    ui.label(format!("File Name: {}", file_name));
                     error_label(ui, "Generation failed");
                 }
                 None if self.reports.file_exists => {
-                    ui.label(format!("File Name: {}", file_name));
                     warning_label(ui, "File already exists, will overwrite");
                 }
-                None if !empty_name => {
-                    ui.label(format!("File Name: {}", file_name));
-                }
                 Some(true) => {
-                    ui.strong("Generation complete.");
+                    ui.strong("Generation complete");
                 }
                 _ => {}
             }
@@ -766,11 +771,17 @@ fn warning_label(ui: &mut Ui, label: &str) {
 }
 
 fn copyable_path(ui: &mut Ui, path: &Path) {
-    if ui
+    let label = ui
         .selectable_label(false, &path.to_string_lossy())
-        .on_hover_text("Click to copy")
-        .clicked()
-    {
+        .on_hover_text("Left click to open in Explorer. Right click to copy.");
+
+    if label.clicked() {
+        if common::open_explorer(path).is_err() {
+            // Do Nothing
+        }
+    }
+
+    if label.secondary_clicked() {
         if let Ok(mut clip) = clipboard::ClipboardContext::new() {
             let _ = clip.set_contents(path.to_string_lossy().to_string());
         }
