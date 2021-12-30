@@ -45,8 +45,8 @@ pub fn create_report(name: &String) -> anyhow::Result<()> {
 pub fn zip_file_name(name: &String) -> String {
     format!(
         "{}_{}.zip",
+        chrono::offset::Local::now().format("%Y-%m-%d"),
         name.replace(char::is_whitespace, "_").to_lowercase(),
-        chrono::offset::Local::now().format("%Y-%m-%d")
     )
 }
 

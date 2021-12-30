@@ -1,7 +1,7 @@
 use crate::cli::SimulatedChannel;
 use crate::logging::LoggingConfiguration;
 use crate::versions::{
-    develop_branch, parse_semver, DownloadStatus, FileInfo, SemVer, VersionsClient,
+    develop_branch, parse_semver, FileInfo, RequestStatus, SemVer, VersionsClient,
 };
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
@@ -57,7 +57,7 @@ pub struct ReportsState {
     pub installed_version: Option<String>,
     pub generate_status: Option<bool>,
     pub file_exists: bool,
-    pub upload_status: Arc<Mutex<DownloadStatus>>
+    pub upload_status: Arc<Mutex<RequestStatus>>,
 }
 
 impl ReportsState {
@@ -94,7 +94,7 @@ pub struct VersionsState {
     pub client: VersionsClient,
     pub branch_names: Vec<String>,
     pub selected_branch: String,
-    pub status: HashMap<(String, FileInfo), Arc<Mutex<DownloadStatus>>>,
+    pub status: HashMap<(String, FileInfo), Arc<Mutex<RequestStatus>>>,
     pub which: VersionsTypes,
 
     filters: HashMap<String, VersionsFilter>,
@@ -240,13 +240,13 @@ impl VersionsState {
         matched
     }
 
-    pub fn get_package_download_status(&self, file_info: &FileInfo) -> DownloadStatus {
+    pub fn get_package_download_status(&self, file_info: &FileInfo) -> RequestStatus {
         let status = self
             .status
             .get(&(self.selected_branch.clone(), file_info.clone()));
 
         match status {
-            None => DownloadStatus::Idle,
+            None => RequestStatus::Idle,
             Some(status) => status.lock().unwrap().clone(),
         }
     }

@@ -52,13 +52,14 @@ pub struct FileInfo {
 }
 
 #[derive(PartialEq, Clone)]
-pub enum DownloadStatus {
+pub enum RequestStatus {
     Idle,
     InProgress,
+    Success,
     Error,
 }
 
-impl Default for DownloadStatus {
+impl Default for RequestStatus {
     fn default() -> Self {
         Self::Idle
     }
@@ -205,12 +206,12 @@ impl VersionsClient {
         &self,
         branch: &String,
         file_name: &String,
-        status: Arc<Mutex<DownloadStatus>>,
+        status: Arc<Mutex<RequestStatus>>,
         repaint: Arc<dyn RepaintSignal>,
     ) -> anyhow::Result<()> {
         let url = format!(
             "{}/{}/{}/{}",
-            BASE_DOWNLOAD_URL,
+            BASE_FILE_URL,
             package_segments(),
             branch,
             file_name
@@ -224,14 +225,14 @@ impl VersionsClient {
         let client = self.client.clone();
         std::thread::spawn(move || {
             {
-                *status.lock().unwrap() = DownloadStatus::InProgress;
+                *status.lock().unwrap() = RequestStatus::InProgress;
             }
             match download_internal(&client, &url, &destination_dir, &file_name) {
                 Ok(_) => {
-                    *status.lock().unwrap() = DownloadStatus::Idle;
+                    *status.lock().unwrap() = RequestStatus::Success;
                 }
                 Err(_) => {
-                    *status.lock().unwrap() = DownloadStatus::Error;
+                    *status.lock().unwrap() = RequestStatus::Error;
                 }
             }
             repaint.request_repaint();
@@ -243,12 +244,12 @@ impl VersionsClient {
     pub fn upload_report(
         &self,
         path: &Path,
-        status: Arc<Mutex<DownloadStatus>>,
+        status: Arc<Mutex<RequestStatus>>,
         repaint: Arc<dyn RepaintSignal>,
     ) -> anyhow::Result<()> {
         let url = format!(
             "{}/{}/{}",
-            BASE_DOWNLOAD_URL,
+            BASE_FILE_URL,
             report_segments(),
             path.file_name().unwrap().to_string_lossy()
         );
@@ -257,14 +258,14 @@ impl VersionsClient {
         let path = PathBuf::from(path);
         std::thread::spawn(move || {
             {
-                *status.lock().unwrap() = DownloadStatus::InProgress;
+                *status.lock().unwrap() = RequestStatus::InProgress;
             }
             match upload_report_internal(&client, &url, &path) {
                 Ok(_) => {
-                    *status.lock().unwrap() = DownloadStatus::Idle;
+                    *status.lock().unwrap() = RequestStatus::Success;
                 }
                 Err(_) => {
-                    *status.lock().unwrap() = DownloadStatus::Error;
+                    *status.lock().unwrap() = RequestStatus::Error;
                 }
             }
             repaint.request_repaint();
@@ -408,6 +409,5 @@ pub fn develop_branch() -> String {
 }
 
 pub const DEVELOP_BRANCH: &str = "develop";
-pub const BASE_DOWNLOAD_URL: &'static str = "https://artifactory.it.keysight.com/artifactory";
-pub const BASE_API_URL: &'static str =
-    "https://artifactory.it.keysight.com/artifactory/api/storage";
+pub const BASE_FILE_URL: &str = "https://artifactory.it.keysight.com/artifactory";
+pub const BASE_API_URL: &str = "https://artifactory.it.keysight.com/artifactory/api/storage";

@@ -1,17 +1,17 @@
 use crate::cli::SimulatedChannel;
+use crate::common::in_cwd;
 use crate::gui_state::{
     FilterOptions, HwconfigState, LoggingState, ReportsState, VersionsFilter, VersionsState,
     VersionsTypes,
 };
 use crate::logging::{Bool, Level, Logger, Sink};
-use crate::versions::{DownloadStatus, FileInfo};
+use crate::versions::{FileInfo, RequestStatus};
 use crate::{common, hwconfig, logging, report, versions};
 use clipboard::ClipboardProvider;
 use eframe::{egui, egui::Ui, epi};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use strum::{Display, EnumIter, IntoEnumIterator};
-use crate::common::in_cwd;
 
 enum SinksAction {
     Remove(usize),
@@ -153,22 +153,30 @@ impl GuiApp {
             &mut self.reports.name,
             Some("Descriptive name for report .zip file. Required."),
         );
+
         let file_name = report::zip_file_name(&self.reports.name);
         let file_path = in_cwd(&file_name);
 
         if self.reports.name_changed() {
             self.reports.generate_status = None;
             self.reports.file_exists = file_path.exists();
+            *self.reports.upload_status.lock().unwrap() = RequestStatus::Idle;
         }
 
-        let empty_name = self.reports.name.is_empty();
-        ui.add_enabled_ui(!empty_name, |ui| {
+        ui.add_enabled_ui(!self.reports.name.is_empty(), |ui| {
             copyable_path(ui, &file_path);
         });
 
+        self.report_generate_button(ui, &file_path);
+        self.report_upload_button(ui, frame, &file_path);
+        ui.separator();
+        self.report_summary(ui);
+    }
+
+    fn report_generate_button(&mut self, ui: &mut Ui, path: &Path) {
         ui.horizontal(|ui| {
             ui.add_enabled_ui(
-                !empty_name && self.reports.generate_status != Some(true),
+                !self.reports.name.is_empty() && self.reports.generate_status != Some(true),
                 |ui| {
                     if ui.button("Generate Report").clicked() {
                         self.reports.generate_status =
@@ -176,20 +184,16 @@ impl GuiApp {
                                 Ok(_) => Some(true),
                                 Err(_) => Some(false),
                             };
-                        self.reports.file_exists = file_path.exists();
+                        self.reports.file_exists = path.exists();
                     }
                 },
             );
 
             match self.reports.generate_status {
-                Some(false) if !self.reports.file_exists => {
-                    error_label(ui, "Generation failed");
-                }
-                Some(false) => {
-                    error_label(ui, "Generation failed");
-                }
+                Some(false) if !self.reports.file_exists => error_label(ui, "Generation failed"),
+                Some(false) => error_label(ui, "Generation failed"),
                 None if self.reports.file_exists => {
-                    warning_label(ui, "File already exists, will overwrite");
+                    warning_label(ui, "File already exists, will overwrite")
                 }
                 Some(true) => {
                     ui.strong("Generation complete");
@@ -197,24 +201,53 @@ impl GuiApp {
                 _ => {}
             }
         });
+    }
 
-        match *self.reports.upload_status.lock().unwrap() {
-            DownloadStatus::Idle => {}
-            DownloadStatus::InProgress => {}
-            DownloadStatus::Error => {}
-        }
+    fn report_upload_button(&mut self, ui: &mut Ui, frame: &mut epi::Frame<'_>, path: &Path) {
+        ui.add_enabled_ui(self.reports.file_exists, |ui| {
+            ui.horizontal(|ui| match *self.reports.upload_status.lock().unwrap() {
+                RequestStatus::InProgress => {
+                    ui.strong("Uploading...");
+                }
+                RequestStatus::Error => {
+                    if ui.button("⬆  Retry ").clicked() {
+                        self.upload_clicked(frame, path);
+                    }
+                    error_label(ui, "Upload failed");
+                }
+                RequestStatus::Idle => {
+                    if ui.button("⬆  Upload").clicked() {
+                        self.upload_clicked(frame, path);
+                    }
+                }
+                RequestStatus::Success => {
+                    ui.add_enabled_ui(false, |ui| {
+                        if ui.button("⬆  Upload").clicked() {
+                            self.upload_clicked(frame, path);
+                        }
+                    });
+                    ui.strong("Upload complete");
+                }
+            });
+        });
+    }
 
-        if ui.button("Upload").clicked() {
-            if self.packages.client.upload_report(
-                &file_path,
+    fn upload_clicked(&self, frame: &mut epi::Frame<'_>, path: &Path) {
+        if self
+            .packages
+            .client
+            .upload_report(
+                path,
                 self.reports.upload_status.clone(),
                 frame.repaint_signal().clone(),
-            ).is_err() {
-                *self.reports.upload_status.lock().unwrap() = DownloadStatus::Error;
-            }
+            )
+            .is_err()
+        {
+            *self.reports.upload_status.lock().unwrap() = RequestStatus::Error;
         }
+    }
 
-        ui.separator();
+    fn report_summary(&mut self, ui: &mut Ui) {
         ui.horizontal(|ui| {
             ui.heading("Summary");
             if ui.button("⟳  Refresh").clicked() {
@@ -225,45 +258,29 @@ impl GuiApp {
         ui.label(format!(
             "Installed Version: {}",
             match &self.reports.installed_version {
-                None => {
-                    "Not Found"
-                }
-                Some(version) => {
-                    version
-                }
+                None => "Not Found",
+                Some(version) => version,
             }
         ));
         ui.label(format!(
             "Log File Path: {}",
             match &self.reports.log_file_path {
-                None => {
-                    "Not Found".to_string()
-                }
-                Some(path) => {
-                    path.display().to_string()
-                }
+                None => "Not Found".to_string(),
+                Some(path) => path.display().to_string(),
             }
         ));
         ui.label(format!(
             "Log Config Path: {}",
             match &self.reports.log_cfg_path {
-                None => {
-                    "Not Found".to_string()
-                }
-                Some(path) => {
-                    path.display().to_string()
-                }
+                None => "Not Found".to_string(),
+                Some(path) => path.display().to_string(),
             }
         ));
         ui.label(format!(
             "HW Config Path: {}",
             match &self.reports.hwconfig_path {
-                None => {
-                    "Not Found".to_string()
-                }
-                Some(path) => {
-                    path.display().to_string()
-                }
+                None => "Not Found".to_string(),
+                Some(path) => path.display().to_string(),
             }
         ));
     }
@@ -281,6 +298,7 @@ impl GuiApp {
         self.reports.installed_version = versions::installed_version();
 
         self.reports.generate_status = None;
+        *self.reports.upload_status.lock().unwrap() = RequestStatus::Idle;
     }
 
     fn events(&mut self, ui: &mut Ui) {
@@ -728,19 +746,22 @@ fn versions_row(
             format!("({})", file_info.date)
         ));
         match state.get_package_download_status(file_info) {
-            DownloadStatus::InProgress => {
+            RequestStatus::InProgress => {
                 ui.strong("Downloading...");
             }
-            DownloadStatus::Error => {
-                error_label(ui, "Download failed");
+            RequestStatus::Error => {
                 if ui.button("⬇  Retry ").clicked() {
                     download_clicked(frame, state, &file_info);
                 }
+                error_label(ui, "Download failed");
             }
-            _ => {
+            RequestStatus::Idle => {
                 if ui.button("⬇  Download").clicked() {
                     download_clicked(frame, state, &file_info);
                 }
+            }
+            RequestStatus::Success => {
+                ui.strong("Download complete");
             }
         }
     })
@@ -753,16 +774,20 @@ fn download_clicked(frame: &mut epi::Frame<'_>, state: &mut VersionsState, file_
         .status
         .entry((state.selected_branch.clone(), file_info.clone()))
         .or_insert(std::sync::Arc::from(std::sync::Mutex::from(
-            DownloadStatus::Idle,
+            RequestStatus::Idle,
         )));
 
-    if state.client.download_package(
-        &state.selected_branch,
-        &file_info.full_name,
-        status.clone(),
-        frame.repaint_signal().clone(),
-    ).is_err() {
-        *status.lock().unwrap() = DownloadStatus::Error;
+    if state
+        .client
+        .download_package(
+            &state.selected_branch,
+            &file_info.full_name,
+            status.clone(),
+            frame.repaint_signal().clone(),
+        )
+        .is_err()
+    {
+        *status.lock().unwrap() = RequestStatus::Error;
     }
 }
 
