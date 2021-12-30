@@ -35,6 +35,7 @@ pub fn create_report(name: &String) -> anyhow::Result<()> {
     }
 
     // TODO: events
+    // TODO: exception log
 
     zip.start_file("summary.txt", Default::default())?;
     zip.write_all(summary.as_bytes())?;
