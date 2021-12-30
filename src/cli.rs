@@ -2,6 +2,7 @@ use crate::events;
 use crate::hwconfig;
 use crate::logging;
 use crate::report;
+use crate::versions;
 use std::path::Path;
 pub use structopt::StructOpt;
 use strum::Display;
@@ -43,7 +44,7 @@ pub enum ReportCommand {
         force: bool,
     },
     Upload {
-        // need to be separate or just have it upload as part of Zip?
+        name: String,
     },
     List {},
     Download {},
@@ -134,7 +135,11 @@ pub fn run(command: Command) -> anyhow::Result<()> {
                 println!("File Name: {}", file_name);
                 report::create_report(&name)?;
             }
-            ReportCommand::Upload { .. } => {}
+            ReportCommand::Upload { name } => {
+                let file_name = report::zip_file_name(&name);
+                let client = versions::VersionsClient::default();
+                client.upload_report(Path::new(&file_name), None, None)?;
+            }
             ReportCommand::List { .. } => {}
         },
         Command::Events(cmd) => match cmd {

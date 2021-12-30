@@ -185,6 +185,7 @@ impl GuiApp {
                                 Err(_) => Some(false),
                             };
                         self.reports.file_exists = path.exists();
+                        *self.reports.upload_status.lock().unwrap() = RequestStatus::Idle;
                     }
                 },
             );
@@ -238,8 +239,8 @@ impl GuiApp {
             .client
             .upload_report(
                 path,
-                self.reports.upload_status.clone(),
-                frame.repaint_signal().clone(),
+                Some(self.reports.upload_status.clone()),
+                Some(frame.repaint_signal().clone()),
             )
             .is_err()
         {

@@ -244,8 +244,8 @@ impl VersionsClient {
     pub fn upload_report(
         &self,
         path: &Path,
-        status: Arc<Mutex<RequestStatus>>,
-        repaint: Arc<dyn RepaintSignal>,
+        status: Option<Arc<Mutex<RequestStatus>>>,
+        repaint: Option<Arc<dyn RepaintSignal>>,
     ) -> anyhow::Result<()> {
         let url = format!(
             "{}/{}/{}",
@@ -257,18 +257,21 @@ impl VersionsClient {
         let client = self.client.clone();
         let path = PathBuf::from(path);
         std::thread::spawn(move || {
-            {
+            if let Some(ref status) = status {
                 *status.lock().unwrap() = RequestStatus::InProgress;
             }
             match upload_report_internal(&client, &url, &path) {
-                Ok(_) => {
-                    *status.lock().unwrap() = RequestStatus::Success;
+                Ok(_) if status.is_some() => {
+                    *status.unwrap().lock().unwrap() = RequestStatus::Success;
                 }
-                Err(_) => {
-                    *status.lock().unwrap() = RequestStatus::Error;
+                Err(_) if status.is_some() => {
+                    *status.unwrap().lock().unwrap() = RequestStatus::Error;
                 }
+                _ => {}
             }
-            repaint.request_repaint();
+            if let Some(repaint) = repaint {
+                repaint.request_repaint();
+            }
         });
 
         Ok(())
