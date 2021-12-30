@@ -98,11 +98,7 @@ impl PartialOrd for SemVer {
 }
 
 pub fn parse_semver(semver: &String) -> Option<SemVer> {
-    let parts: Vec<Option<u16>> = semver
-        .split("-")
-        .map(|x| x.parse::<u16>().ok())
-        .take(4)
-        .collect();
+    let parts: Vec<Option<u16>> = semver.split("-").map(|x| x.parse::<u16>().ok()).take(4).collect();
 
     match parts[..] {
         [Some(major), Some(minor), Some(patch), ..] => {
@@ -129,12 +125,7 @@ mod tests {
     use crate::versions::parse_semver;
     use std::cmp::Ordering;
 
-    fn make_semver(
-        major: u16,
-        minor: u16,
-        patch: u16,
-        prerelease: Option<u16>,
-    ) -> versions::SemVer {
+    fn make_semver(major: u16, minor: u16, patch: u16, prerelease: Option<u16>) -> versions::SemVer {
         versions::SemVer {
             major,
             minor,
@@ -145,15 +136,9 @@ mod tests {
 
     #[test]
     fn parse() {
-        assert_eq!(
-            parse_semver(&"1-2-3-4".to_string()).unwrap().prerelease,
-            Some(4)
-        );
+        assert_eq!(parse_semver(&"1-2-3-4".to_string()).unwrap().prerelease, Some(4));
         assert_eq!(parse_semver(&"1-2-3".to_string()).unwrap().prerelease, None);
-        assert_eq!(
-            parse_semver(&"1-2-3-4-5".to_string()).unwrap().prerelease,
-            Some(4)
-        );
+        assert_eq!(parse_semver(&"1-2-3-4-5".to_string()).unwrap().prerelease, Some(4));
         assert_eq!(parse_semver(&"1-2".to_string()).is_none(), true);
         assert_eq!(parse_semver(&"1-2-l".to_string()).is_none(), true);
     }
@@ -209,17 +194,10 @@ impl VersionsClient {
         status: Arc<Mutex<RequestStatus>>,
         repaint: Arc<dyn RepaintSignal>,
     ) -> anyhow::Result<()> {
-        let url = format!(
-            "{}/{}/{}/{}",
-            BASE_FILE_URL,
-            package_segments(),
-            branch,
-            file_name
-        );
+        let url = format!("{}/{}/{}/{}", BASE_FILE_URL, package_segments(), branch, file_name);
 
-        let destination_dir = dirs::download_dir().unwrap_or(dirs::home_dir().ok_or(
-            anyhow::anyhow!("Could not find Downloads or Home directories"),
-        )?);
+        let destination_dir = dirs::download_dir()
+            .unwrap_or(dirs::home_dir().ok_or(anyhow::anyhow!("Could not find Downloads or Home directories"))?);
 
         let file_name = file_name.clone();
         let client = self.client.clone();
@@ -364,19 +342,11 @@ fn download_internal(
     file_name: &String,
 ) -> anyhow::Result<()> {
     let mut out = std::fs::File::create(format!("{}/{}", destination_dir.display(), file_name))?;
-    client
-        .get(url)
-        .send()?
-        .error_for_status()?
-        .copy_to(&mut out)?;
+    client.get(url).send()?.error_for_status()?.copy_to(&mut out)?;
     Ok(())
 }
 
-fn upload_report_internal(
-    client: &Arc<reqwest::blocking::Client>,
-    url: &String,
-    path: &Path,
-) -> anyhow::Result<()> {
+fn upload_report_internal(client: &Arc<reqwest::blocking::Client>, url: &String, path: &Path) -> anyhow::Result<()> {
     let file = std::fs::File::open(path)?;
     client.put(url).body(file).send()?.error_for_status()?;
     Ok(())
@@ -391,11 +361,7 @@ pub fn package_segments() -> String {
     format!(
         "{}/{}",
         "generic-local-pwsg/siggen",
-        if cfg!(windows) {
-            "packages"
-        } else {
-            "packages-linux"
-        }
+        if cfg!(windows) { "packages" } else { "packages-linux" }
     )
 }
 

@@ -89,10 +89,9 @@ impl Default for SimulatedChannel {
 pub fn run(command: Command) -> anyhow::Result<()> {
     match command {
         Command::HwConfig(cmd) => match cmd {
-            HwConfigCommand::Set {
-                config,
-                channel_count,
-            } => hwconfig::set(&hwconfig::get_path_or_cwd(), config, channel_count)?,
+            HwConfigCommand::Set { config, channel_count } => {
+                hwconfig::set(&hwconfig::get_path_or_cwd(), config, channel_count)?
+            }
             HwConfigCommand::Restore => println!("Not yet implemented!"),
             HwConfigCommand::Show => match hwconfig::read_from(&hwconfig::get_path_or_cwd()) {
                 Some(text) => {

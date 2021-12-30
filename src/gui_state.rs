@@ -1,8 +1,6 @@
 use crate::cli::SimulatedChannel;
 use crate::logging::LoggingConfiguration;
-use crate::versions::{
-    develop_branch, parse_semver, FileInfo, RequestStatus, SemVer, VersionsClient,
-};
+use crate::versions::{develop_branch, parse_semver, FileInfo, RequestStatus, SemVer, VersionsClient};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
@@ -191,9 +189,7 @@ impl VersionsState {
             files
                 .iter()
                 .filter_map(|file| parse_semver(&file.version))
-                .for_each(|semver| {
-                    VersionsState::populate_filter_with_one_version(&semver, &mut filter.options)
-                });
+                .for_each(|semver| VersionsState::populate_filter_with_one_version(&semver, &mut filter.options));
             self.filters.insert(branch.clone(), filter);
         }
     }
@@ -206,19 +202,14 @@ impl VersionsState {
 
         match options.next.get_mut(&version.major) {
             None => {
-                options
-                    .next
-                    .insert(version.major, FilterOptions::new(minor));
+                options.next.insert(version.major, FilterOptions::new(minor));
             }
             Some(ref mut major) => match major.next.get_mut(&version.minor) {
                 None => {
                     major.next.insert(version.minor, FilterOptions::new(patch));
                 }
                 Some(ref mut minor) => {
-                    minor
-                        .next
-                        .entry(version.patch)
-                        .or_insert(FilterOptions::default());
+                    minor.next.entry(version.patch).or_insert(FilterOptions::default());
                 }
             },
         }
@@ -241,9 +232,7 @@ impl VersionsState {
     }
 
     pub fn get_package_download_status(&self, file_info: &FileInfo) -> RequestStatus {
-        let status = self
-            .status
-            .get(&(self.selected_branch.clone(), file_info.clone()));
+        let status = self.status.get(&(self.selected_branch.clone(), file_info.clone()));
 
         match status {
             None => RequestStatus::Idle,

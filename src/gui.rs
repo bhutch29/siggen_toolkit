@@ -1,8 +1,7 @@
 use crate::cli::SimulatedChannel;
 use crate::common::in_cwd;
 use crate::gui_state::{
-    FilterOptions, HwconfigState, LoggingState, ReportsState, VersionsFilter, VersionsState,
-    VersionsTypes,
+    FilterOptions, HwconfigState, LoggingState, ReportsState, VersionsFilter, VersionsState, VersionsTypes,
 };
 use crate::logging::{Bool, Level, Logger, Sink};
 use crate::versions::{FileInfo, RequestStatus};
@@ -109,14 +108,8 @@ impl epi::App for GuiApp {
         });
     }
 
-    fn setup(
-        &mut self,
-        _ctx: &egui::CtxRef,
-        _frame: &mut epi::Frame<'_>,
-        _storage: Option<&dyn epi::Storage>,
-    ) {
-        self.logger.config =
-            logging::get_config_from(&logging::get_path_or_cwd()).unwrap_or_default();
+    fn setup(&mut self, _ctx: &egui::CtxRef, _frame: &mut epi::Frame<'_>, _storage: Option<&dyn epi::Storage>) {
+        self.logger.config = logging::get_config_from(&logging::get_path_or_cwd()).unwrap_or_default();
         self.logger.loaded_from = Some(logging::get_path_or_cwd());
         self.update_report_summary();
     }
@@ -128,17 +121,11 @@ impl epi::App for GuiApp {
 
 impl GuiApp {
     fn make_tab(&mut self, ui: &mut Ui, tab: Option<Tabs>) {
-        if ui
-            .selectable_label(
-                self.selected_tab == tab,
-                if tab.is_none() {
-                    "About".to_string()
-                } else {
-                    tab.unwrap().to_string()
-                },
-            )
-            .clicked()
-        {
+        let text = match tab {
+            None => "About".to_string(),
+            Some(_) => tab.unwrap().to_string(),
+        };
+        if ui.selectable_label(self.selected_tab == tab, text).clicked() {
             self.selected_tab = tab;
         }
     }
@@ -179,11 +166,10 @@ impl GuiApp {
                 !self.reports.name.is_empty() && self.reports.generate_status != Some(true),
                 |ui| {
                     if ui.button("Generate Report").clicked() {
-                        self.reports.generate_status =
-                            match report::create_report(&self.reports.name) {
-                                Ok(_) => Some(true),
-                                Err(_) => Some(false),
-                            };
+                        self.reports.generate_status = match report::create_report(&self.reports.name) {
+                            Ok(_) => Some(true),
+                            Err(_) => Some(false),
+                        };
                         self.reports.file_exists = path.exists();
                         *self.reports.upload_status.lock().unwrap() = RequestStatus::Idle;
                     }
@@ -193,9 +179,7 @@ impl GuiApp {
             match self.reports.generate_status {
                 Some(false) if !self.reports.file_exists => error_label(ui, "Generation failed"),
                 Some(false) => error_label(ui, "Generation failed"),
-                None if self.reports.file_exists => {
-                    warning_label(ui, "File already exists, will overwrite")
-                }
+                None if self.reports.file_exists => warning_label(ui, "File already exists, will overwrite"),
                 Some(true) => {
                     ui.strong("Generation complete");
                 }
@@ -288,11 +272,7 @@ impl GuiApp {
 
     fn update_report_summary(&mut self) {
         let log_path = logging::get_log_path();
-        self.reports.log_file_path = if log_path.exists() {
-            Some(log_path)
-        } else {
-            None
-        };
+        self.reports.log_file_path = if log_path.exists() { Some(log_path) } else { None };
 
         self.reports.log_cfg_path = logging::get_path();
         self.reports.hwconfig_path = hwconfig::get_path();
@@ -401,11 +381,7 @@ impl GuiApp {
                     SimulatedChannel::MCS31 { signal_count: 0 },
                     "MCS3.1",
                 );
-                ui.selectable_value(
-                    &mut self.hwconfig.platform,
-                    SimulatedChannel::MCS15,
-                    "MCS1.5",
-                );
+                ui.selectable_value(&mut self.hwconfig.platform, SimulatedChannel::MCS15, "MCS1.5");
             });
     }
 
@@ -499,16 +475,12 @@ impl GuiApp {
         }
         if ui.button("Save").clicked() {
             self.logger.remove_error = false;
-            self.logger.write_error =
-                logging::set_config(&path, self.logger.config.clone()).is_err();
+            self.logger.write_error = logging::set_config(&path, self.logger.config.clone()).is_err();
             if !self.logger.write_error {
                 self.logger.loaded_from = Some(path.clone());
             }
         }
-        if ui
-            .add_enabled(exists, egui::Button::new("Delete"))
-            .clicked()
-        {
+        if ui.add_enabled(exists, egui::Button::new("Delete")).clicked() {
             self.logger.write_error = false;
             self.logger.remove_error = std::fs::remove_file(&path).is_err();
             if self.logger.loaded_from == Some(path) {
@@ -550,18 +522,10 @@ impl GuiApp {
                     action = Some(SinksAction::Remove(i));
                 }
                 ui.strong(sink.to_string());
-                if ui
-                    .button(" ➕ ")
-                    .on_hover_text("Enable on all loggers")
-                    .clicked()
-                {
+                if ui.button(" ➕ ").on_hover_text("Enable on all loggers").clicked() {
                     action = Some(SinksAction::Enable(sink.get_name().clone()));
                 }
-                if ui
-                    .button(" ➖ ")
-                    .on_hover_text("Disable on all loggers")
-                    .clicked()
-                {
+                if ui.button(" ➖ ").on_hover_text("Disable on all loggers").clicked() {
                     action = Some(SinksAction::Disable(sink.get_name().clone()));
                 }
             });
@@ -605,9 +569,7 @@ impl GuiApp {
                     text_edit_labeled(ui, "File Path", file_name, None);
                     truncate_ui(ui, truncate);
                 }
-                Sink::Console {
-                    ref mut is_color, ..
-                } => {
+                Sink::Console { ref mut is_color, .. } => {
                     let mut color = logging::is_true(is_color);
                     ui.checkbox(&mut color, "Color");
                     *is_color = Some(Bool::Boolean(color));
@@ -734,12 +696,7 @@ fn version_filters(ui: &mut Ui, filter: &mut VersionsFilter) {
     }
 }
 
-fn versions_row(
-    ui: &mut Ui,
-    frame: &mut epi::Frame<'_>,
-    state: &mut VersionsState,
-    file_info: &FileInfo,
-) {
+fn versions_row(ui: &mut Ui, frame: &mut epi::Frame<'_>, state: &mut VersionsState, file_info: &FileInfo) {
     ui.horizontal(|ui| {
         ui.monospace(format!(
             "{:12} {:15}",
@@ -774,9 +731,7 @@ fn download_clicked(frame: &mut epi::Frame<'_>, state: &mut VersionsState, file_
     let status = state
         .status
         .entry((state.selected_branch.clone(), file_info.clone()))
-        .or_insert(std::sync::Arc::from(std::sync::Mutex::from(
-            RequestStatus::Idle,
-        )));
+        .or_insert(std::sync::Arc::from(std::sync::Mutex::from(RequestStatus::Idle)));
 
     if state
         .client
