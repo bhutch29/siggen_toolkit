@@ -4,7 +4,7 @@ use crate::gui_state::{
     FilterOptions, HwconfigState, LoggingState, ReportsState, VersionsFilter, VersionsState, VersionsTypes,
 };
 use crate::logging::{Bool, Level, Logger, Sink};
-use crate::versions::{FileInfo, RequestStatus};
+use crate::versions::{FileInfo, RequestStatus, BASE_FILE_URL};
 use crate::{common, hwconfig, logging, report, versions};
 use clipboard::ClipboardProvider;
 use eframe::{egui, egui::Ui, epi};
@@ -155,7 +155,12 @@ impl GuiApp {
         });
 
         self.report_generate_button(ui, &file_path);
+
+        ui.separator();
+        ui.heading("Upload to Artifactory");
         self.report_upload_button(ui, frame, &file_path);
+        ui.hyperlink_to("Artifactory Upload Location", format!("{}/{}", BASE_FILE_URL, versions::report_segments()));
+
         ui.separator();
         self.report_summary(ui);
     }
@@ -207,9 +212,7 @@ impl GuiApp {
                 }
                 RequestStatus::Success => {
                     ui.add_enabled_ui(false, |ui| {
-                        if ui.button("⬆  Upload").clicked() {
-                            self.upload_clicked(frame, path);
-                        }
+                        ui.button("⬆  Upload");
                     });
                     ui.strong("Upload complete");
                 }
