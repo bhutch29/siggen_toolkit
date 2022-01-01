@@ -2,7 +2,6 @@ use crate::{hwconfig, logging, versions};
 use std::fmt::Write as fmtWrite;
 use std::io::{Read, Write};
 use std::path::PathBuf;
-use zip;
 
 pub fn create_report(name: &String) -> anyhow::Result<()> {
     let file_name = zip_file_name(name);
@@ -10,7 +9,7 @@ pub fn create_report(name: &String) -> anyhow::Result<()> {
     let mut zip = zip::ZipWriter::new(file);
     zip.add_directory("config/", Default::default())?;
 
-    let mut summary = String::from(format!("Report Name: {}", name));
+    let mut summary = format!("Report Name: {}", name);
 
     if let Some(version) = versions::installed_version() {
         writeln!(summary, "Installed SigGen Version: {}", version)?;

@@ -98,7 +98,7 @@ impl PartialOrd for SemVer {
 }
 
 pub fn parse_semver(semver: &String) -> Option<SemVer> {
-    let parts: Vec<Option<u16>> = semver.split("-").map(|x| x.parse::<u16>().ok()).take(4).collect();
+    let parts: Vec<Option<u16>> = semver.split('-').map(|x| x.parse::<u16>().ok()).take(4).collect();
 
     match parts[..] {
         [Some(major), Some(minor), Some(patch), ..] => {
@@ -263,7 +263,7 @@ impl VersionsClient {
                     .trim_start_matches("siggen_")
                     .trim_end_matches(".zip")
                     .trim_end_matches("_linux")
-                    .split("_")
+                    .split('_')
                     .take(2)
                     .map(|s| s.to_string())
                     .collect();
@@ -331,7 +331,7 @@ fn parse_children(response: ArtifactoryDirectory) -> Vec<String> {
     response
         .children
         .iter()
-        .map(|child| child.uri.trim_start_matches("/").to_string())
+        .map(|child| child.uri.trim_start_matches('/').to_string())
         .collect()
 }
 

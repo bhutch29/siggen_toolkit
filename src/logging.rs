@@ -1,5 +1,4 @@
 use crate::common::*;
-use dirs;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use strum::{Display, EnumIter};
@@ -135,7 +134,7 @@ pub enum Bool {
 pub fn is_true(value: &Option<Bool>) -> bool {
     match value {
         None => false,
-        Some(Bool::Boolean(bool)) => bool.clone(),
+        Some(Bool::Boolean(bool)) => *bool,
         Some(Bool::String(string)) => string == "true",
     }
 }
@@ -179,7 +178,7 @@ pub fn valid_paths() -> Vec<PathBuf> {
         vec![dirs::home_dir()]
     }
     .into_iter()
-    .filter_map(|x| x)
+    .flatten()
     .map(|x| x.join(PW_FOLDERS).join(FILE_NAME))
     .collect()
 }

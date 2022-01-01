@@ -43,7 +43,7 @@ pub fn valid_paths() -> Vec<PathBuf> {
         vec![dirs::home_dir()]
     }
     .into_iter()
-    .filter_map(|x| x)
+    .flatten()
     .map(|x| x.join(PW_FOLDERS).join(FILE_NAME))
     .collect()
 }

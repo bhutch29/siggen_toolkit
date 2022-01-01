@@ -668,17 +668,15 @@ fn versions(ui: &mut Ui, frame: &mut epi::Frame<'_>, state: &mut VersionsState) 
 
 fn version_filters(ui: &mut Ui, filter: &mut VersionsFilter) {
     let options = &filter.options.next;
-    let major_copy = filter.major_filter.clone();
     filter_dropdown(ui, "Major", &mut filter.major_filter, options);
-    if filter.major_filter != major_copy {
+    if filter.major_filter != filter.major_filter {
         filter.minor_filter = None;
         filter.patch_filter = None;
     }
     if let Some(major_filter) = filter.major_filter {
         let options = &options.get(&major_filter).unwrap().next;
-        let minor_copy = filter.minor_filter.clone();
-        filter_dropdown(ui, "Minor", &mut filter.minor_filter, &options);
-        if filter.minor_filter != minor_copy {
+        filter_dropdown(ui, "Minor", &mut filter.minor_filter, options);
+        if filter.minor_filter != filter.minor_filter {
             filter.patch_filter = None;
         }
         if let Some(minor_filter) = filter.minor_filter {
@@ -712,13 +710,13 @@ fn versions_row(ui: &mut Ui, frame: &mut epi::Frame<'_>, state: &mut VersionsSta
             }
             RequestStatus::Error => {
                 if ui.button("⬇  Retry ").clicked() {
-                    download_clicked(frame, state, &file_info);
+                    download_clicked(frame, state, file_info);
                 }
                 error_label(ui, "Download failed");
             }
             RequestStatus::Idle => {
                 if ui.button("⬇  Download").clicked() {
-                    download_clicked(frame, state, &file_info);
+                    download_clicked(frame, state, file_info);
                 }
             }
             RequestStatus::Success => {
@@ -774,10 +772,8 @@ fn copyable_path(ui: &mut Ui, path: &Path) {
         .selectable_label(false, &path.to_string_lossy())
         .on_hover_text("Left click to open in Explorer. Right click to copy.");
 
-    if label.clicked() {
-        if common::open_explorer(path).is_err() {
-            // Do Nothing
-        }
+    if label.clicked() && common::open_explorer(path).is_err() {
+        // Do Nothing
     }
 
     if label.secondary_clicked() {
@@ -831,14 +827,11 @@ fn filter_dropdown(
     }
     ui.add_enabled_ui(!only_one_key, |ui| {
         egui::ComboBox::from_label(label)
-            .selected_text(format!(
-                "{}",
-                if filter_val.is_none() {
+            .selected_text((if filter_val.is_none() {
                     "*".to_string()
                 } else {
                     filter_val.unwrap().to_string()
-                }
-            ))
+                }))
             .show_ui(ui, |ui| {
                 if !only_one_key {
                     ui.selectable_value(filter_val, None, "*");

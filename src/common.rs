@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::process;
 
 pub fn in_cwd<P: AsRef<Path>>(file: P) -> PathBuf {
-    PathBuf::from(std::env::current_dir().unwrap().join(file))
+    std::env::current_dir().unwrap().join(file)
 }
 
 pub const PW_FOLDERS: &str = "Keysight/PathWave/SignalGenerator";
