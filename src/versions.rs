@@ -97,7 +97,7 @@ impl PartialOrd for SemVer {
     }
 }
 
-pub fn parse_semver(semver: &String) -> Option<SemVer> {
+pub fn parse_semver(semver: &str) -> Option<SemVer> {
     let parts: Vec<Option<u16>> = semver.split('-').map(|x| x.parse::<u16>().ok()).take(4).collect();
 
     match parts[..] {
@@ -189,8 +189,8 @@ impl VersionsClient {
     // TODO: download to directories by branch
     pub fn download_package(
         &self,
-        branch: &String,
-        file_name: &String,
+        branch: &str,
+        file_name: &str,
         status: Arc<Mutex<RequestStatus>>,
         repaint: Arc<dyn RepaintSignal>,
     ) -> anyhow::Result<()> {
@@ -199,7 +199,7 @@ impl VersionsClient {
         let destination_dir = dirs::download_dir()
             .unwrap_or(dirs::home_dir().ok_or(anyhow::anyhow!("Could not find Downloads or Home directories"))?);
 
-        let file_name = file_name.clone();
+        let file_name = file_name.to_string();
         let client = self.client.clone();
         std::thread::spawn(move || {
             {
@@ -255,7 +255,7 @@ impl VersionsClient {
         Ok(())
     }
 
-    pub fn get_packages_info(&self, branch: &String) -> Vec<FileInfo> {
+    pub fn get_packages_info(&self, branch: &str) -> Vec<FileInfo> {
         self.get_info(branch, &package_segments())
             .into_iter()
             .filter_map(|full_name| {
@@ -281,7 +281,7 @@ impl VersionsClient {
             .collect()
     }
 
-    pub fn get_installers_info(&self, _branch: &String) -> Vec<FileInfo> {
+    pub fn get_installers_info(&self, _branch: &str) -> Vec<FileInfo> {
         // let info = self.get_info(branch, &installer_segments());
         Vec::new()
         // TODO:
@@ -302,7 +302,7 @@ impl VersionsClient {
         // result
     }
 
-    fn get_info(&self, branch: &String, segments: &String) -> Vec<String> {
+    fn get_info(&self, branch: &str, segments: &str) -> Vec<String> {
         parse_children(
             self.api_request(&format!("{}/{}", segments, branch))
                 .unwrap_or_default(),
@@ -317,11 +317,11 @@ impl VersionsClient {
         self.get_branch_names(&installer_segments())
     }
 
-    fn get_branch_names(&self, segments: &String) -> Vec<String> {
+    fn get_branch_names(&self, segments: &str) -> Vec<String> {
         parse_children(self.api_request(segments).unwrap_or_default())
     }
 
-    fn api_request(&self, segments: &String) -> Option<ArtifactoryDirectory> {
+    fn api_request(&self, segments: &str) -> Option<ArtifactoryDirectory> {
         let request = self.client.get(format!("{}/{}", BASE_API_URL, segments));
         serde_json::from_str(&request.send().ok()?.text().unwrap_or_default()).ok()?
     }
@@ -337,16 +337,16 @@ fn parse_children(response: ArtifactoryDirectory) -> Vec<String> {
 
 fn download_internal(
     client: &Arc<reqwest::blocking::Client>,
-    url: &String,
+    url: &str,
     destination_dir: &Path,
-    file_name: &String,
+    file_name: &str,
 ) -> anyhow::Result<()> {
     let mut out = std::fs::File::create(format!("{}/{}", destination_dir.display(), file_name))?;
     client.get(url).send()?.error_for_status()?.copy_to(&mut out)?;
     Ok(())
 }
 
-fn upload_report_internal(client: &Arc<reqwest::blocking::Client>, url: &String, path: &Path) -> anyhow::Result<()> {
+fn upload_report_internal(client: &Arc<reqwest::blocking::Client>, url: &str, path: &Path) -> anyhow::Result<()> {
     let file = std::fs::File::open(path)?;
     client.put(url).body(file).send()?.error_for_status()?;
     Ok(())

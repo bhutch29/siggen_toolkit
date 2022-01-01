@@ -212,7 +212,9 @@ impl GuiApp {
                 }
                 RequestStatus::Success => {
                     ui.add_enabled_ui(false, |ui| {
-                        ui.button("⬆  Upload");
+                        if ui.button("⬆  Upload").clicked() {
+                            // Do Nothing
+                        }
                     });
                     ui.strong("Upload complete");
                 }
@@ -668,15 +670,17 @@ fn versions(ui: &mut Ui, frame: &mut epi::Frame<'_>, state: &mut VersionsState) 
 
 fn version_filters(ui: &mut Ui, filter: &mut VersionsFilter) {
     let options = &filter.options.next;
+    let major_copy = filter.major_filter;
     filter_dropdown(ui, "Major", &mut filter.major_filter, options);
-    if filter.major_filter != filter.major_filter {
+    if filter.major_filter != major_copy {
         filter.minor_filter = None;
         filter.patch_filter = None;
     }
     if let Some(major_filter) = filter.major_filter {
         let options = &options.get(&major_filter).unwrap().next;
+        let minor_copy = filter.minor_filter;
         filter_dropdown(ui, "Minor", &mut filter.minor_filter, options);
-        if filter.minor_filter != filter.minor_filter {
+        if filter.minor_filter != minor_copy {
             filter.patch_filter = None;
         }
         if let Some(minor_filter) = filter.minor_filter {
@@ -732,7 +736,7 @@ fn download_clicked(frame: &mut epi::Frame<'_>, state: &mut VersionsState, file_
     let status = state
         .status
         .entry((state.selected_branch.clone(), file_info.clone()))
-        .or_insert(std::sync::Arc::from(std::sync::Mutex::from(RequestStatus::Idle)));
+        .or_insert_with(|| std::sync::Arc::from(std::sync::Mutex::from(RequestStatus::Idle)));
 
     if state
         .client
@@ -789,7 +793,7 @@ fn truncate_ui(ui: &mut Ui, truncate: &mut Option<Bool>) {
     *truncate = Some(Bool::Boolean(trunc));
 }
 
-fn sinks_checkboxes(ui: &mut Ui, logger: &mut Logger, sinks: &Vec<Sink>) {
+fn sinks_checkboxes(ui: &mut Ui, logger: &mut Logger, sinks: &[Sink]) {
     for sink in sinks {
         let name = sink.get_name();
         let mut checked = logger.sinks.contains(name);
@@ -827,16 +831,16 @@ fn filter_dropdown(
     }
     ui.add_enabled_ui(!only_one_key, |ui| {
         egui::ComboBox::from_label(label)
-            .selected_text((if filter_val.is_none() {
+            .selected_text(if filter_val.is_none() {
                     "*".to_string()
                 } else {
                     filter_val.unwrap().to_string()
-                }))
+                })
             .show_ui(ui, |ui| {
                 if !only_one_key {
                     ui.selectable_value(filter_val, None, "*");
                 }
-                for (key, _) in filter_options {
+                for key in filter_options.keys() {
                     ui.selectable_value(filter_val, Some(*key), key.to_string());
                 }
             });

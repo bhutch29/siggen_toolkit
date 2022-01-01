@@ -32,7 +32,7 @@ pub fn get_path() -> Option<PathBuf> {
 }
 
 pub fn get_path_or_cwd() -> PathBuf {
-    get_path().unwrap_or(in_cwd(FILE_NAME))
+    get_path().unwrap_or_else(|| in_cwd(FILE_NAME))
 }
 
 pub fn valid_paths() -> Vec<PathBuf> {

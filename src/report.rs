@@ -3,7 +3,7 @@ use std::fmt::Write as fmtWrite;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 
-pub fn create_report(name: &String) -> anyhow::Result<()> {
+pub fn create_report(name: &str) -> anyhow::Result<()> {
     let file_name = zip_file_name(name);
     let file = std::fs::File::create(&file_name).unwrap();
     let mut zip = zip::ZipWriter::new(file);
@@ -42,7 +42,7 @@ pub fn create_report(name: &String) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn zip_file_name(name: &String) -> String {
+pub fn zip_file_name(name: &str) -> String {
     format!(
         "{}_{}.zip",
         chrono::offset::Local::now().format("%Y-%m-%d"),

@@ -168,7 +168,7 @@ pub fn get_path() -> Option<PathBuf> {
 }
 
 pub fn get_path_or_cwd() -> PathBuf {
-    get_path().unwrap_or(in_cwd(FILE_NAME))
+    get_path().unwrap_or_else(|| in_cwd(FILE_NAME))
 }
 
 pub fn valid_paths() -> Vec<PathBuf> {
@@ -204,7 +204,7 @@ pub fn get_log_path() -> PathBuf {
                 _ => None,
             })
         })
-        .unwrap_or(PathBuf::from(CODE_DEFINED_LOG_PATH))
+        .unwrap_or_else(|| PathBuf::from(CODE_DEFINED_LOG_PATH))
 }
 
 pub fn show() -> anyhow::Result<()> {
@@ -215,7 +215,7 @@ pub fn show() -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn remove_invalid_sinks(logger: &mut Logger, sinks: &Vec<Sink>) {
+pub fn remove_invalid_sinks(logger: &mut Logger, sinks: &[Sink]) {
     logger.sinks.retain(|logger_sink_name| {
         sinks
             .iter()

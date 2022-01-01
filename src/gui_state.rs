@@ -136,12 +136,12 @@ impl VersionsState {
         }
     }
 
-    fn update_cache(&mut self, branch: &String) {
+    fn update_cache(&mut self, branch: &str) {
         let info = match &self.which {
             VersionsTypes::Packages => self.client.get_packages_info(branch),
             VersionsTypes::Installers => self.client.get_installers_info(branch),
         };
-        self.cache.insert(branch.clone(), info);
+        self.cache.insert(branch.to_string(), info);
         self.sort_cache_for(branch);
         self.populate_filter_options_for(branch);
     }
@@ -164,33 +164,26 @@ impl VersionsState {
             .and_then(|files| files.last().cloned())
     }
 
-    pub fn sort_cache_for(&mut self, branch: &String) {
+    pub fn sort_cache_for(&mut self, branch: &str) {
         if let Some(files) = self.cache.get_mut(branch) {
             files.sort_by(|a, b| {
-                let parsed_a = parse_semver(&a.version);
-                let parsed_b = parse_semver(&b.version);
-
-                if parsed_a.is_some() && parsed_b.is_some() {
-                    return parsed_a.unwrap().partial_cmp(&parsed_b.unwrap()).unwrap();
-                }
-
-                if parsed_a.is_none() {
-                    Ordering::Greater
-                } else {
-                    Ordering::Less
+                match (parse_semver(&a.version), parse_semver(&b.version)) {
+                    (Some(a), Some(b)) => a.partial_cmp(&b).unwrap(),
+                    (None, _) => Ordering::Greater,
+                    _ => Ordering::Less,
                 }
             });
         }
     }
 
-    pub fn populate_filter_options_for(&mut self, branch: &String) {
+    pub fn populate_filter_options_for(&mut self, branch: &str) {
         if let Some(files) = self.cache.get_mut(branch) {
             let mut filter = VersionsFilter::default();
             files
                 .iter()
                 .filter_map(|file| parse_semver(&file.version))
                 .for_each(|semver| VersionsState::populate_filter_with_one_version(&semver, &mut filter.options));
-            self.filters.insert(branch.clone(), filter);
+            self.filters.insert(branch.to_string(), filter);
         }
     }
 
@@ -209,13 +202,13 @@ impl VersionsState {
                     major.next.insert(version.minor, FilterOptions::new(patch));
                 }
                 Some(ref mut minor) => {
-                    minor.next.entry(version.patch).or_insert(FilterOptions::default());
+                    minor.next.entry(version.patch).or_insert_with(FilterOptions::default);
                 }
             },
         }
     }
 
-    pub fn filter_match(&self, version: &String) -> bool {
+    pub fn filter_match(&self, version: &str) -> bool {
         let mut matched = true;
         if let (Some(version), Some(filter)) = (parse_semver(version), self.get_current_filter()) {
             if let Some(major) = filter.major_filter {
