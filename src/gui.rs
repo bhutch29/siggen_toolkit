@@ -295,7 +295,7 @@ impl GuiApp {
             }
         ));
         ui.monospace(format!(
-            "User Settings Paths: {}",
+            "Per-User Settings Paths: {}",
             if self.reports.user_settings_paths.is_empty() {
                 "Not Found".to_string()
             } else {

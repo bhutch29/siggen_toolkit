@@ -42,7 +42,7 @@ pub fn create_report(name: &str) -> anyhow::Result<()> {
 
     let user_settings_paths = get_all_user_settings_paths();
     if !user_settings_paths.is_empty() {
-        writeln!(summary, "No Reset System Settings Path: {}", user_settings_paths.join(", "))?;
+        writeln!(summary, "Per-User Settings Path: {}", user_settings_paths.join(", "))?;
         for path in user_settings_paths {
             add_file(&mut zip, PathBuf::from(path))?;
         }
