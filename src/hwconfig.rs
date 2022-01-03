@@ -59,11 +59,6 @@ pub fn set(path: &Path, config: cli::SimulatedChannel, channel_count: u8) -> any
     Ok(())
 }
 
-// for entry in WalkDir::new("/home/bhutch/projects/siggen_toolkit") {
-//     let entry = entry.unwrap();
-//     println!("{}", entry.path().display());
-// }
-
 pub fn read_from(path: &Path) -> Option<String> {
     if !path.exists() {
         return None;

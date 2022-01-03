@@ -2038,7 +2038,6 @@ dependencies = [
  "serde_json",
  "structopt",
  "strum",
- "walkdir",
  "win-event-log",
  "winres",
  "zip",
