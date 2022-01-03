@@ -158,7 +158,10 @@ impl GuiApp {
 
         ui.separator();
         ui.heading("Upload to Artifactory");
-        ui.hyperlink_to("Upload Location", format!("{}/{}", BASE_FILE_URL, versions::report_segments()));
+        ui.hyperlink_to(
+            "Upload Location",
+            format!("{}/{}", BASE_FILE_URL, versions::report_segments()),
+        );
         self.report_upload_button(ui, frame, &file_path);
 
         ui.separator();
@@ -285,6 +288,21 @@ impl GuiApp {
             }
         ));
         ui.monospace(format!(
+            "No Reset System Settings Path: {}",
+            match &self.reports.no_reset_system_settings_path {
+                None => "Not Found".to_string(),
+                Some(path) => path.display().to_string(),
+            }
+        ));
+        ui.monospace(format!(
+            "User Settings Paths: {}",
+            if self.reports.user_settings_paths.is_empty() {
+                "Not Found".to_string()
+            } else {
+                self.reports.user_settings_paths.join(", ")
+            }
+        ));
+        ui.monospace(format!(
             "HW Config Path: {}",
             match &self.reports.hwconfig_path {
                 None => "Not Found".to_string(),
@@ -294,13 +312,19 @@ impl GuiApp {
     }
 
     fn update_report_summary(&mut self) {
-        let log_path = logging::get_log_path();
-        self.reports.log_file_path = if log_path.exists() { Some(log_path) } else { None };
+        let path = logging::get_log_path();
+        self.reports.log_file_path = if path.exists() { Some(path) } else { None };
 
-        let exception_log_path = logging::get_exception_log_path();
-        self.reports.exception_log_file_path = if exception_log_path.exists() { Some(exception_log_path) } else { None };
+        let path = logging::get_exception_log_path();
+        self.reports.exception_log_file_path = if path.exists() { Some(path) } else { None };
 
         self.reports.log_cfg_path = logging::get_path();
+
+        let path = report::get_no_reset_system_settings_path();
+        self.reports.no_reset_system_settings_path = if path.exists() { Some(path) } else { None };
+
+        self.reports.user_settings_paths = report::get_all_user_settings_paths();
+
         self.reports.hwconfig_path = hwconfig::get_path();
         self.reports.installed_version = versions::installed_version();
 
@@ -854,10 +878,10 @@ fn filter_dropdown(
     ui.add_enabled_ui(!only_one_key, |ui| {
         egui::ComboBox::from_label(label)
             .selected_text(if filter_val.is_none() {
-                    "*".to_string()
-                } else {
-                    filter_val.unwrap().to_string()
-                })
+                "*".to_string()
+            } else {
+                filter_val.unwrap().to_string()
+            })
             .show_ui(ui, |ui| {
                 if !only_one_key {
                     ui.selectable_value(filter_val, None, "*");

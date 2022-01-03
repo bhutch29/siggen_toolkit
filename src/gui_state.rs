@@ -51,6 +51,8 @@ pub struct ReportsState {
     pub previous_name: String,
     pub log_file_path: Option<PathBuf>,
     pub exception_log_file_path: Option<PathBuf>,
+    pub no_reset_system_settings_path: Option<PathBuf>,
+    pub user_settings_paths: Vec<String>,
     pub log_cfg_path: Option<PathBuf>,
     pub hwconfig_path: Option<PathBuf>,
     pub installed_version: Option<String>,
@@ -167,12 +169,10 @@ impl VersionsState {
 
     pub fn sort_cache_for(&mut self, branch: &str) {
         if let Some(files) = self.cache.get_mut(branch) {
-            files.sort_by(|a, b| {
-                match (parse_semver(&a.version), parse_semver(&b.version)) {
-                    (Some(a), Some(b)) => a.partial_cmp(&b).unwrap(),
-                    (None, _) => Ordering::Greater,
-                    _ => Ordering::Less,
-                }
+            files.sort_by(|a, b| match (parse_semver(&a.version), parse_semver(&b.version)) {
+                (Some(a), Some(b)) => a.partial_cmp(&b).unwrap(),
+                (None, _) => Ordering::Greater,
+                _ => Ordering::Less,
             });
         }
     }

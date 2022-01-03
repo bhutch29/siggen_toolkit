@@ -21,6 +21,7 @@ image = "0.23"
 dirs = "4.0"
 chrono = "*"
 zip = "0.5.13"
+glob = "0.3.0"
 
 [target.'cfg(windows)'.dependencies]
 win-event-log = { git = "https://github.com/rustysec/win-event-log-rs" }

@@ -179,7 +179,12 @@ pub fn valid_paths() -> Vec<PathBuf> {
     }
     .into_iter()
     .flatten()
-    .map(|x| x.join("Keysight").join("PathWave").join("SignalGenerator").join(FILE_NAME))
+    .map(|x| {
+        x.join("Keysight")
+            .join("PathWave")
+            .join("SignalGenerator")
+            .join(FILE_NAME)
+    })
     .collect()
 }
 

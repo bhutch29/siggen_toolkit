@@ -17,21 +17,35 @@ pub fn create_report(name: &str) -> anyhow::Result<()> {
         zip.write_all(version.as_bytes())?;
     }
 
-    let log_path = logging::get_log_path();
-    if log_path.exists() {
-        writeln!(summary, "Log File Path: {}", log_path.display())?;
-        add_file(&mut zip, log_path)?;
+    let path = logging::get_log_path();
+    if path.exists() {
+        writeln!(summary, "Log File Path: {}", path.display())?;
+        add_file(&mut zip, path)?;
     }
 
-    let log_path = logging::get_exception_log_path();
-    if log_path.exists() {
-        writeln!(summary, "Exception Log File Path: {}", log_path.display())?;
-        add_file(&mut zip, log_path)?;
+    let path = logging::get_exception_log_path();
+    if path.exists() {
+        writeln!(summary, "Exception Log File Path: {}", path.display())?;
+        add_file(&mut zip, path)?;
     }
 
     if let Some(path) = logging::get_path() {
         writeln!(summary, "Log Config Path: {}", path.display())?;
         add_file(&mut zip, path)?;
+    }
+
+    let path = get_no_reset_system_settings_path();
+    if path.exists() {
+        writeln!(summary, "No Reset System Settings Path: {}", path.display())?;
+        add_file(&mut zip, path)?;
+    }
+
+    let user_settings_paths = get_all_user_settings_paths();
+    if !user_settings_paths.is_empty() {
+        writeln!(summary, "No Reset System Settings Path: {}", user_settings_paths.join(", "))?;
+        for path in user_settings_paths {
+            add_file(&mut zip, PathBuf::from(path))?;
+        }
     }
 
     if let Some(path) = hwconfig::get_path() {
@@ -40,7 +54,6 @@ pub fn create_report(name: &str) -> anyhow::Result<()> {
     }
 
     // TODO: events
-    // TODO: exception log
 
     zip.start_file("summary.txt", Default::default())?;
     zip.write_all(summary.as_bytes())?;
@@ -64,4 +77,29 @@ fn add_file(zip: &mut zip::ZipWriter<std::fs::File>, path: PathBuf) -> anyhow::R
     f.read_to_end(&mut buffer)?;
     zip.write_all(&*buffer)?;
     Ok(())
+}
+
+pub fn get_no_reset_system_settings_path() -> PathBuf {
+    PathBuf::from("E:\\")
+        .join("Keysight")
+        .join("PathWave")
+        .join("SignalGenerator")
+        .join("SigGenInstrumentSpecificSettings.sgen")
+}
+
+pub fn get_all_user_settings_paths() -> Vec<String> {
+    dirs::data_dir()
+        .and_then(|dir| {
+            glob::glob(
+                dir.join("Keysight")
+                    .join("PathWave")
+                    .join("SignalGenerator")
+                    .join("*.sgen")
+                    .to_string_lossy()
+                    .as_ref(),
+            )
+            .ok()
+        })
+        .map(|glob| glob.flatten().map(|path| path.to_string_lossy().to_string()).collect())
+        .unwrap_or_default()
 }

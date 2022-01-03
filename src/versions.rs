@@ -186,7 +186,6 @@ mod tests {
 }
 
 impl VersionsClient {
-    // TODO: download to directories by branch
     pub fn download_package(
         &self,
         branch: &str,
@@ -197,7 +196,7 @@ impl VersionsClient {
         let url = format!("{}/{}/{}/{}", BASE_FILE_URL, package_segments(), branch, file_name);
 
         let destination_dir = dirs::download_dir()
-            .unwrap_or(dirs::home_dir().ok_or(anyhow::anyhow!("Could not find Downloads or Home directories"))?);
+            .unwrap_or(dirs::home_dir().ok_or(anyhow::anyhow!("Could not find Downloads or Home directories"))?).join("SigGen_Versions").join(branch);
 
         let file_name = file_name.to_string();
         let client = self.client.clone();
@@ -341,6 +340,7 @@ fn download_internal(
     destination_dir: &Path,
     file_name: &str,
 ) -> anyhow::Result<()> {
+    std::fs::create_dir_all(destination_dir)?;
     let mut out = std::fs::File::create(format!("{}/{}", destination_dir.display(), file_name))?;
     client.get(url).send()?.error_for_status()?.copy_to(&mut out)?;
     Ok(())
@@ -354,11 +354,10 @@ fn upload_report_internal(client: &Arc<reqwest::blocking::Client>, url: &str, pa
 
 pub fn installed_version() -> Option<String> {
     if cfg!(windows) {
-        std::fs::read_to_string(r"C:\Program Files\Keysight\PathWave\SignalGenerator\package.json").ok().and_then(|text| {
-            serde_json::from_str::<serde_json::Value>(&text).ok()
-        }).map(|json| {
-            json["version"].to_string().trim_matches('"').to_string()
-        })
+        std::fs::read_to_string(r"C:\Program Files\Keysight\PathWave\SignalGenerator\package.json")
+            .ok()
+            .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+            .map(|json| json["version"].to_string().trim_matches('"').to_string())
     } else {
         None
     }
