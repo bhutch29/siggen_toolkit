@@ -139,8 +139,8 @@ mod tests {
         assert_eq!(parse_semver(&"1-2-3-4".to_string()).unwrap().prerelease, Some(4));
         assert_eq!(parse_semver(&"1-2-3".to_string()).unwrap().prerelease, None);
         assert_eq!(parse_semver(&"1-2-3-4-5".to_string()).unwrap().prerelease, Some(4));
-        assert_eq!(parse_semver(&"1-2".to_string()).is_none(), true);
-        assert_eq!(parse_semver(&"1-2-l".to_string()).is_none(), true);
+        assert!(parse_semver(&"1-2".to_string()).is_none());
+        assert!(parse_semver(&"1-2-l".to_string()).is_none());
     }
 
     #[test]
@@ -353,8 +353,15 @@ fn upload_report_internal(client: &Arc<reqwest::blocking::Client>, url: &str, pa
 }
 
 pub fn installed_version() -> Option<String> {
-    //TODO:
-    None
+    if cfg!(windows) {
+        std::fs::read_to_string(r"C:\Program Files\Keysight\PathWave\SignalGenerator\package.json").ok().and_then(|text| {
+            serde_json::from_str::<serde_json::Value>(&text).ok()
+        }).map(|json| {
+            json["version"].to_string().trim_matches('"').to_string()
+        })
+    } else {
+        None
+    }
 }
 
 pub fn package_segments() -> String {

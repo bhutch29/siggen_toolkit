@@ -38,13 +38,13 @@ pub fn get_path_or_cwd() -> PathBuf {
 pub fn valid_paths() -> Vec<PathBuf> {
     // TODO: SigGen first checks the cwd
     if cfg!(windows) {
-        vec![dirs::document_dir(), Some(PathBuf::from("E:"))]
+        vec![dirs::document_dir(), Some(PathBuf::from("E:\\"))]
     } else {
         vec![dirs::home_dir()]
     }
     .into_iter()
     .flatten()
-    .map(|x| x.join(PW_FOLDERS).join(FILE_NAME))
+    .map(|x| x.join("Keysight").join("PathWave").join("SignalGenerator").join(FILE_NAME))
     .collect()
 }
 

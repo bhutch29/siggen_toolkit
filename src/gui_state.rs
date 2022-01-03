@@ -50,6 +50,7 @@ pub struct ReportsState {
     pub name: String,
     pub previous_name: String,
     pub log_file_path: Option<PathBuf>,
+    pub exception_log_file_path: Option<PathBuf>,
     pub log_cfg_path: Option<PathBuf>,
     pub hwconfig_path: Option<PathBuf>,
     pub installed_version: Option<String>,

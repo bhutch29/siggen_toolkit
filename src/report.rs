@@ -9,7 +9,7 @@ pub fn create_report(name: &str) -> anyhow::Result<()> {
     let mut zip = zip::ZipWriter::new(file);
     zip.add_directory("config/", Default::default())?;
 
-    let mut summary = format!("Report Name: {}", name);
+    let mut summary = format!("Report Name: {}\n", name);
 
     if let Some(version) = versions::installed_version() {
         writeln!(summary, "Installed SigGen Version: {}", version)?;
@@ -20,6 +20,12 @@ pub fn create_report(name: &str) -> anyhow::Result<()> {
     let log_path = logging::get_log_path();
     if log_path.exists() {
         writeln!(summary, "Log File Path: {}", log_path.display())?;
+        add_file(&mut zip, log_path)?;
+    }
+
+    let log_path = logging::get_exception_log_path();
+    if log_path.exists() {
+        writeln!(summary, "Exception Log File Path: {}", log_path.display())?;
         add_file(&mut zip, log_path)?;
     }
 

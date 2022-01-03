@@ -173,13 +173,13 @@ pub fn get_path_or_cwd() -> PathBuf {
 
 pub fn valid_paths() -> Vec<PathBuf> {
     if cfg!(windows) {
-        vec![dirs::document_dir(), Some(PathBuf::from("E:"))]
+        vec![dirs::document_dir(), Some(PathBuf::from("E:\\"))]
     } else {
         vec![dirs::home_dir()]
     }
     .into_iter()
     .flatten()
-    .map(|x| x.join(PW_FOLDERS).join(FILE_NAME))
+    .map(|x| x.join("Keysight").join("PathWave").join("SignalGenerator").join(FILE_NAME))
     .collect()
 }
 
@@ -207,6 +207,10 @@ pub fn get_log_path() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from(CODE_DEFINED_LOG_PATH))
 }
 
+pub fn get_exception_log_path() -> PathBuf {
+    PathBuf::from(EXCEPTION_LOG_PATH)
+}
+
 pub fn show() -> anyhow::Result<()> {
     println!(
         "{}",
@@ -230,3 +234,9 @@ const CODE_DEFINED_LOG_PATH: &str = r"C:\Temp\Keysight.PathWave.SG.log";
 
 #[cfg(not(target_os = "windows"))]
 const CODE_DEFINED_LOG_PATH: &str = "/tmp/Keysight.PathWave.SG.log";
+
+#[cfg(target_os = "windows")]
+const EXCEPTION_LOG_PATH: &str = r"C:\Temp\Keysight.PathWave.SG.ExceptionLog.txt";
+
+#[cfg(not(target_os = "windows"))]
+const EXCEPTION_LOG_PATH: &str = "/tmp/Keysight.PathWave.SG.ExceptionLog.txt";

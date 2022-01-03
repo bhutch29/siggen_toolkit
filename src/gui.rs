@@ -158,8 +158,8 @@ impl GuiApp {
 
         ui.separator();
         ui.heading("Upload to Artifactory");
+        ui.hyperlink_to("Upload Location", format!("{}/{}", BASE_FILE_URL, versions::report_segments()));
         self.report_upload_button(ui, frame, &file_path);
-        ui.hyperlink_to("Artifactory Upload Location", format!("{}/{}", BASE_FILE_URL, versions::report_segments()));
 
         ui.separator();
         self.report_summary(ui);
@@ -217,6 +217,17 @@ impl GuiApp {
                         }
                     });
                     ui.strong("Upload complete");
+                    let url = format!(
+                        "{}/{}/{}",
+                        BASE_FILE_URL,
+                        versions::report_segments(),
+                        path.file_name().unwrap().to_string_lossy()
+                    );
+                    if ui.button("🗐").on_hover_text(&url).clicked() {
+                        if let Ok(mut clip) = clipboard::ClipboardContext::new() {
+                            let _ = clip.set_contents(url);
+                        }
+                    }
                 }
             });
         });
@@ -245,28 +256,35 @@ impl GuiApp {
             }
         });
 
-        ui.label(format!(
+        ui.monospace(format!(
             "Installed Version: {}",
             match &self.reports.installed_version {
                 None => "Not Found",
                 Some(version) => version,
             }
         ));
-        ui.label(format!(
+        ui.monospace(format!(
             "Log File Path: {}",
             match &self.reports.log_file_path {
                 None => "Not Found".to_string(),
                 Some(path) => path.display().to_string(),
             }
         ));
-        ui.label(format!(
+        ui.monospace(format!(
+            "Exception Log File Path: {}",
+            match &self.reports.exception_log_file_path {
+                None => "Not Found".to_string(),
+                Some(path) => path.display().to_string(),
+            }
+        ));
+        ui.monospace(format!(
             "Log Config Path: {}",
             match &self.reports.log_cfg_path {
                 None => "Not Found".to_string(),
                 Some(path) => path.display().to_string(),
             }
         ));
-        ui.label(format!(
+        ui.monospace(format!(
             "HW Config Path: {}",
             match &self.reports.hwconfig_path {
                 None => "Not Found".to_string(),
@@ -278,6 +296,9 @@ impl GuiApp {
     fn update_report_summary(&mut self) {
         let log_path = logging::get_log_path();
         self.reports.log_file_path = if log_path.exists() { Some(log_path) } else { None };
+
+        let exception_log_path = logging::get_exception_log_path();
+        self.reports.exception_log_file_path = if exception_log_path.exists() { Some(exception_log_path) } else { None };
 
         self.reports.log_cfg_path = logging::get_path();
         self.reports.hwconfig_path = hwconfig::get_path();
@@ -293,6 +314,7 @@ impl GuiApp {
         if !cfg!(windows) {
             ui.label("Event Log is only supported on Windows.");
         } else {
+            ui.label("Event Log UI is currently under development.");
             // TODO
         }
     }
@@ -850,7 +872,7 @@ fn filter_dropdown(
 pub fn run() -> anyhow::Result<()> {
     let app = GuiApp::default();
 
-    let icon_bytes = include_bytes!("../keysight-logo.ico");
+    let icon_bytes = include_bytes!("../keysight-logo-gear.ico");
     let options = match image::load_from_memory_with_format(icon_bytes, image::ImageFormat::Ico) {
         Ok(icon) => {
             let icon = icon.to_rgba8();

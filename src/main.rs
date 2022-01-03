@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"] // Hides console on Windows
+
 mod cli;
 mod common;
 mod events;
