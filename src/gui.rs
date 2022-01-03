@@ -295,11 +295,11 @@ impl GuiApp {
             }
         ));
         ui.monospace(format!(
-            "Per-User Settings Paths: {}",
-            if self.reports.user_settings_paths.is_empty() {
+            "Data Directory State Files: {}",
+            if self.reports.data_dir_state_files.is_empty() {
                 "Not Found".to_string()
             } else {
-                self.reports.user_settings_paths.join(", ")
+                self.reports.data_dir_state_files.join(", ")
             }
         ));
         ui.monospace(format!(
@@ -323,7 +323,7 @@ impl GuiApp {
         let path = report::get_no_reset_system_settings_path();
         self.reports.no_reset_system_settings_path = if path.exists() { Some(path) } else { None };
 
-        self.reports.user_settings_paths = report::get_all_user_settings_paths();
+        self.reports.data_dir_state_files = report::get_data_dir_state_file_paths();
 
         self.reports.hwconfig_path = hwconfig::get_path();
         self.reports.installed_version = versions::installed_version();

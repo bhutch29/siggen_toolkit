@@ -52,7 +52,7 @@ pub struct ReportsState {
     pub log_file_path: Option<PathBuf>,
     pub exception_log_file_path: Option<PathBuf>,
     pub no_reset_system_settings_path: Option<PathBuf>,
-    pub user_settings_paths: Vec<String>,
+    pub data_dir_state_files: Vec<String>,
     pub log_cfg_path: Option<PathBuf>,
     pub hwconfig_path: Option<PathBuf>,
     pub installed_version: Option<String>,

@@ -40,10 +40,10 @@ pub fn create_report(name: &str) -> anyhow::Result<()> {
         add_file(&mut zip, path)?;
     }
 
-    let user_settings_paths = get_all_user_settings_paths();
-    if !user_settings_paths.is_empty() {
-        writeln!(summary, "Per-User Settings Path: {}", user_settings_paths.join(", "))?;
-        for path in user_settings_paths {
+    let paths = get_data_dir_state_file_paths();
+    if !paths.is_empty() {
+        writeln!(summary, "Data Directory State Files: {}", paths.join(", "))?;
+        for path in paths {
             add_file(&mut zip, PathBuf::from(path))?;
         }
     }
@@ -87,7 +87,7 @@ pub fn get_no_reset_system_settings_path() -> PathBuf {
         .join("SigGenInstrumentSpecificSettings.sgen")
 }
 
-pub fn get_all_user_settings_paths() -> Vec<String> {
+pub fn get_data_dir_state_file_paths() -> Vec<String> {
     dirs::data_dir()
         .and_then(|dir| {
             glob::glob(
