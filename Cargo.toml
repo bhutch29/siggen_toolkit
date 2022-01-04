@@ -25,4 +25,6 @@ gethostname = "0.2.1"
 
 [target.'cfg(windows)'.dependencies]
 win-event-log = { git = "https://github.com/rustysec/win-event-log-rs" }
+
+[target.'cfg(windows)'.build-dependencies]
 winres = "0.1.12"
