@@ -19,7 +19,7 @@ anyhow = "1.0"
 image = "0.23"
 dirs = "4.0"
 chrono = "*"
-zip = "0.5.13"
+zip = {version = "0.5.13", default-features = false, features=["deflate", "time"]}
 glob = "0.3.0"
 gethostname = "0.2.1"
 
