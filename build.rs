@@ -1,7 +1,8 @@
 fn main() -> std::io::Result<()> {
-    #[cfg(target_os = "windows")]
-    winres::WindowsResource::new()
-        .set_icon("keysight-logo-gear.ico")
-        .compile()?;
+    // TODO: fails due to missing-file error on Windows
+    // #[cfg(target_os = "windows")]
+    // winres::WindowsResource::new()
+    //     .set_icon("keysight-logo-gear.ico")
+    //     .compile()?;
     Ok(())
 }
