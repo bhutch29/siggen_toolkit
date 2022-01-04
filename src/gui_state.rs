@@ -59,6 +59,7 @@ pub struct ReportsState {
     pub generate_status: Option<bool>,
     pub file_exists: bool,
     pub upload_status: Arc<Mutex<RequestStatus>>,
+    pub host_name: Option<String>,
 }
 
 impl ReportsState {

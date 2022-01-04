@@ -17,6 +17,12 @@ pub fn create_report(name: &str) -> anyhow::Result<()> {
         zip.write_all(version.as_bytes())?;
     }
 
+    if let Some(hostname) = gethostname::gethostname().to_str() {
+        writeln!(summary, "Host Name: {}", hostname)?;
+        zip.start_file("hostname.txt", Default::default())?;
+        zip.write_all(hostname.as_bytes())?;
+    }
+
     let path = logging::get_log_path();
     if path.exists() {
         writeln!(summary, "Log File Path: {}", path.display())?;

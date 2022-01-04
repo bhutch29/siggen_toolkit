@@ -267,6 +267,13 @@ impl GuiApp {
             }
         ));
         ui.monospace(format!(
+            "Host Name: {}",
+            match &self.reports.host_name {
+                None => "Not Found",
+                Some(hostname) => hostname,
+            }
+        ));
+        ui.monospace(format!(
             "Log File Path: {}",
             match &self.reports.log_file_path {
                 None => "Not Found".to_string(),
@@ -330,6 +337,8 @@ impl GuiApp {
 
         self.reports.generate_status = None;
         *self.reports.upload_status.lock().unwrap() = RequestStatus::Idle;
+
+        self.reports.host_name = Some(gethostname::gethostname().to_string_lossy().to_string());
     }
 
     fn events(&mut self, ui: &mut Ui) {
