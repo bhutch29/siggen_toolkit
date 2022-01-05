@@ -11,6 +11,8 @@ pub fn create_report(name: &str) -> anyhow::Result<()> {
 
     let mut summary = format!("Report Name: {}\n", name);
 
+    // TODO: include tool version in summary
+
     if let Some(version) = versions::installed_version() {
         writeln!(summary, "Installed SigGen Version: {}", version)?;
         zip.start_file("version.txt", Default::default())?;
