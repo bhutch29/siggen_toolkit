@@ -1,3 +1,4 @@
+use crate::gui_state::VersionsTypes;
 use eframe::epi::RepaintSignal;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -188,15 +189,22 @@ mod tests {
 impl VersionsClient {
     pub fn download_package(
         &self,
+        which: &VersionsTypes,
         branch: &str,
         file_name: &str,
         status: Arc<Mutex<RequestStatus>>,
         repaint: Arc<dyn RepaintSignal>,
     ) -> anyhow::Result<()> {
-        let url = format!("{}/{}/{}/{}", BASE_FILE_URL, package_segments(), branch, file_name);
+        let segments = match which {
+            VersionsTypes::Packages => package_segments(),
+            VersionsTypes::Installers => installer_segments(),
+        };
+        let url = format!("{}/{}/{}/{}", BASE_FILE_URL, segments, branch, file_name);
 
         let destination_dir = dirs::download_dir()
-            .unwrap_or(dirs::home_dir().ok_or(anyhow::anyhow!("Could not find Downloads or Home directories"))?).join("SigGen_Versions").join(branch);
+            .unwrap_or(dirs::home_dir().ok_or(anyhow::anyhow!("Could not find Downloads or Home directories"))?)
+            .join("SigGen_Versions")
+            .join(branch);
 
         let file_name = file_name.to_string();
         let client = self.client.clone();
@@ -280,25 +288,29 @@ impl VersionsClient {
             .collect()
     }
 
-    pub fn get_installers_info(&self, _branch: &str) -> Vec<FileInfo> {
-        // let info = self.get_info(branch, &installer_segments());
-        Vec::new()
-        // TODO:
-        // let mut result = Vec::new();
-        // for full_name in info {
-        //     let formatted = full_name
-        //         .trim_start_matches("siggen_")
-        //         .trim_end_matches(".zip")
-        //         .trim_end_matches("_linux");
-        //     let split: [String; 2] = formatted.split("_").take(2).collect();
-        //
-        //     result.push(FileInfo {
-        //         full_name,
-        //         version: split[0].clone(),
-        //         date: split[1].clone(),
-        //     });
-        // }
-        // result
+    pub fn get_installers_info(&self, branch: &str) -> Vec<FileInfo> {
+        self.get_info(branch, &installer_segments())
+            .into_iter()
+            .filter_map(|full_name| {
+                let mut split: VecDeque<String> = full_name
+                    .trim_start_matches("Keysight.PathWave.SG.Setup_")
+                    .trim_end_matches(".exe")
+                    .split('_')
+                    .take(2)
+                    .map(|s| s.to_string())
+                    .collect();
+
+                if let (Some(version), Some(date)) = (split.pop_front(), split.pop_front()) {
+                    Some(FileInfo {
+                        full_name,
+                        version,
+                        date,
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     fn get_info(&self, branch: &str, segments: &str) -> Vec<String> {

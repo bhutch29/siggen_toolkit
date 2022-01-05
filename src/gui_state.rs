@@ -96,7 +96,8 @@ pub struct VersionsState {
     pub client: VersionsClient,
     pub branch_names: Vec<String>,
     pub selected_branch: String,
-    pub status: HashMap<(String, FileInfo), Arc<Mutex<RequestStatus>>>,
+    pub package_status: HashMap<(String, FileInfo), Arc<Mutex<RequestStatus>>>,
+    pub installer_status: HashMap<(String, FileInfo), Arc<Mutex<RequestStatus>>>,
     pub which: VersionsTypes,
 
     filters: HashMap<String, VersionsFilter>,
@@ -226,8 +227,12 @@ impl VersionsState {
         matched
     }
 
-    pub fn get_package_download_status(&self, file_info: &FileInfo) -> RequestStatus {
-        let status = self.status.get(&(self.selected_branch.clone(), file_info.clone()));
+    pub fn get_download_status(&self, file_info: &FileInfo) -> RequestStatus {
+        let status = match self.which {
+            VersionsTypes::Packages => &self.package_status,
+            VersionsTypes::Installers => &self.installer_status,
+        }
+        .get(&(self.selected_branch.clone(), file_info.clone()));
 
         match status {
             None => RequestStatus::Idle,

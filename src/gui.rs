@@ -763,7 +763,7 @@ fn versions_row(ui: &mut Ui, frame: &mut epi::Frame<'_>, state: &mut VersionsSta
             file_info.version,
             format!("({})", file_info.date)
         ));
-        match state.get_package_download_status(file_info) {
+        match state.get_download_status(file_info) {
             RequestStatus::InProgress => {
                 ui.strong("Downloading...");
             }
@@ -788,14 +788,17 @@ fn versions_row(ui: &mut Ui, frame: &mut epi::Frame<'_>, state: &mut VersionsSta
 }
 
 fn download_clicked(frame: &mut epi::Frame<'_>, state: &mut VersionsState, file_info: &FileInfo) {
-    let status = state
-        .status
-        .entry((state.selected_branch.clone(), file_info.clone()))
-        .or_insert_with(|| std::sync::Arc::from(std::sync::Mutex::from(RequestStatus::Idle)));
+    let status = match state.which {
+        VersionsTypes::Packages => &mut state.package_status,
+        VersionsTypes::Installers => &mut state.installer_status,
+    }
+    .entry((state.selected_branch.clone(), file_info.clone()))
+    .or_insert_with(|| std::sync::Arc::from(std::sync::Mutex::from(RequestStatus::Idle)));
 
     if state
         .client
         .download_package(
+            &state.which,
             &state.selected_branch,
             &file_info.full_name,
             status.clone(),
