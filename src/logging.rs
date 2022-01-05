@@ -234,14 +234,14 @@ pub fn remove_invalid_sinks(logger: &mut Logger, sinks: &[Sink]) {
 
 pub const FILE_NAME: &str = "ksflogger.cfg";
 
-#[cfg(target_os = "windows")]
+#[cfg(windows)]
 const CODE_DEFINED_LOG_PATH: &str = r"C:\Temp\Keysight.PathWave.SG.log";
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(not(windows))]
 const CODE_DEFINED_LOG_PATH: &str = "/tmp/Keysight.PathWave.SG.log";
 
-#[cfg(target_os = "windows")]
+#[cfg(windows)]
 const EXCEPTION_LOG_PATH: &str = r"C:\Temp\Keysight.PathWave.SG.ExceptionLog.txt";
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(not(windows))]
 const EXCEPTION_LOG_PATH: &str = "/tmp/Keysight.PathWave.SG.ExceptionLog.txt";

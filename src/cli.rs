@@ -46,8 +46,6 @@ pub enum ReportCommand {
     Upload {
         name: String,
     },
-    List {},
-    Download {},
 }
 
 #[derive(StructOpt, Debug)]
@@ -121,7 +119,6 @@ pub fn run(command: Command) -> anyhow::Result<()> {
             }
         },
         Command::Report(cmd) => match cmd {
-            ReportCommand::Download { .. } => {}
             ReportCommand::Zip { name, force } => {
                 let file_name = report::zip_file_name(&name);
                 if !force && Path::new(&file_name).exists() {
@@ -139,7 +136,6 @@ pub fn run(command: Command) -> anyhow::Result<()> {
                 let client = versions::VersionsClient::default();
                 client.upload_report(Path::new(&file_name), None, None)?;
             }
-            ReportCommand::List { .. } => {}
         },
         Command::Events(cmd) => match cmd {
             EventsCommand::List { .. } => {
