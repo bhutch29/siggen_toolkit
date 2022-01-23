@@ -4,9 +4,9 @@
 import groovy.transform.Field
 
 @Field
-def linux = "win-node10"
+def linux = "rhl-node10"
 @Field
-def windows = "rhel-node10"
+def windows = "win-node10"
 
 def pipelineParams = [:]
 
