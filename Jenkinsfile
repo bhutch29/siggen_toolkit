@@ -99,6 +99,7 @@ def GetParallelPipeline() {
 
         stage("Download Rust") {
             if(laneConfig.profile == linux) {
+                Shell("yum install rust cargo")
             } else {
                 Shell("choco install rust")
             }
