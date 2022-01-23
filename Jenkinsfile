@@ -4,9 +4,9 @@
 import groovy.transform.Field
 
 @Field
-def linux = "rhel-7-gcc-10.2-release"
+def linux = "win-node10"
 @Field
-def windows = "vs-15-release"
+def windows = "rhel-node10"
 
 def pipelineParams = [:]
 
@@ -57,9 +57,7 @@ pipeline {
 
             steps {
                 script {
-                    echo "before"
                     RunParallelPipeline(pipelineParams)
-                    echo "after"
                 }
             }
         }
@@ -76,7 +74,6 @@ pipeline {
 
 def RunParallelPipeline(Map pipelineParams = [:]) {
     def parallelPipeline = GetParallelPipeline()
-    echo "got parallel pipeline"
     MatrixBuild(pipelineParams, parallelPipeline)
 }
 
