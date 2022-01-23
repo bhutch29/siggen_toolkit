@@ -56,7 +56,9 @@ pipeline {
 
             steps {
                 script {
+                    echo "before"
                     RunParallelPipeline(pipelineParams)
+                    echo "after"
                 }
             }
         }
@@ -73,6 +75,7 @@ pipeline {
 
 def RunParallelPipeline(Map pipelineParams = [:]) {
     def parallelPipeline = GetParallelPipeline()
+    echo "got parallel pipeline"
     MatrixBuild(pipelineParams, parallelPipeline)
 }
 
