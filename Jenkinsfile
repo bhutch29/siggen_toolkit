@@ -86,6 +86,7 @@ pipeline {
 
             steps {
                 script {
+                    echo pipelineParams.dump()
                     RunParallelPipeline(pipelineParams)
                 }
             }
