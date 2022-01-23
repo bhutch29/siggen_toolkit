@@ -51,6 +51,17 @@ pipeline {
             }
         }
 
+        stage ('Set Conan Environment') {
+          	agent { label "kosipipelineexecutor" }
+
+            steps {
+                script {
+                    pipelineParams = ConanInsertAutomaticParams(pipelineParams)
+                  	CleanWorkspace(pipelineParams)
+                }
+            }
+        }
+
         stage ('Build') {
             agent none
 
