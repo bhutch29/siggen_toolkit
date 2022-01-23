@@ -13,25 +13,6 @@ def projectConfig = [
     projectName: 'siggen_toolkit',
     profiles: [ windows, linux ],
   	primaryNode: linux,
-    conanDependenciesRepos: [
-        'conan-local-truss',
-        'conan-local-ngc',
-        'conan-local-HVIcore',
-        'conan-local-rosetta',
-        'conan-local-vxt2',
-        'conan-local-mcs3',
-      	'conan-local-k3p',
-        'conan-local-pwic',
-      	'conan-local-cc',
-      	'conan-local-pwsg',
-      	'conan-local-ml',
-        'conan-local-kal',
-      	'conan-local-legacy',
-      	'conan-keysight',
-        'conan-remote-bincrafters',
-        'conan-remote-bintray' ],
-  	conanIncludeDefaultRepos: false,
-    npmRegistry: 'npm-keysight',
   	cleanOnFailure: true,
     slack: [
         channel: '#proj-siggen_toolkit-ci',
@@ -86,7 +67,6 @@ pipeline {
 
             steps {
                 script {
-                    echo pipelineParams.dump()
                     RunParallelPipeline(pipelineParams)
                 }
             }
