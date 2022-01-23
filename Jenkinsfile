@@ -100,12 +100,12 @@ def GetParallelPipeline() {
         stage("Download Rust") {
             if(laneConfig.profile == linux) {
             } else {
-                echo "choco install rust".execute().text
+                Shell("choco install rust")
             }
         }
 
         stage("Cargo Build") {
-            echo "cargo build".execute().text
+            Shell("cargo build")
         }
 
         stage("Cargo Test") {
