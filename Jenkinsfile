@@ -1,19 +1,37 @@
-@Library
-('KOSi Pipeline Library@v3.3.2') _
+@Library('KOSi Pipeline Library@v3.3.2') _
 
 import groovy.transform.Field
 
 @Field
-def linux = "rhl-node10"
+def linux = "rhel-7-gcc-10.2-release"
 @Field
-def windows = "win-node10"
+def windows = "vs-15-release"
 
 def pipelineParams = [:]
 
 def projectConfig = [
     projectName: 'siggen_toolkit',
-    labels: [ windows, linux ],
+    profiles: [ windows, linux ],
   	primaryNode: linux,
+    conanDependenciesRepos: [
+        'conan-local-truss',
+        'conan-local-ngc',
+        'conan-local-HVIcore',
+        'conan-local-rosetta',
+        'conan-local-vxt2',
+        'conan-local-mcs3',
+      	'conan-local-k3p',
+        'conan-local-pwic',
+      	'conan-local-cc',
+      	'conan-local-pwsg',
+      	'conan-local-ml',
+        'conan-local-kal',
+      	'conan-local-legacy',
+      	'conan-keysight',
+        'conan-remote-bincrafters',
+        'conan-remote-bintray' ],
+  	conanIncludeDefaultRepos: false,
+    npmRegistry: 'npm-keysight',
   	cleanOnFailure: true,
     slack: [
         channel: '#proj-siggen_toolkit-ci',
@@ -47,6 +65,17 @@ pipeline {
             steps {
                 script {
                     pipelineParams = InsertVaultToken(pipelineParams)
+                  	CleanWorkspace(pipelineParams)
+                }
+            }
+        }
+
+        stage ('Set Conan Environment') {
+          	agent { label "kosipipelineexecutor" }
+
+            steps {
+                script {
+                    pipelineParams = ConanInsertAutomaticParams(pipelineParams)
                   	CleanWorkspace(pipelineParams)
                 }
             }
