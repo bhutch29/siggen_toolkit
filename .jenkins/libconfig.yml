@@ -1,0 +1,10 @@
+conan:
+  profiles:
+    vs-15-release:
+      build_node:
+        label: win-node10
+        type: vsphere
+    rhel-7-gcc-10.2-release:
+      build_node:
+        label: rhl-GCC10
+        type: vsphere
