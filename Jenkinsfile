@@ -1,4 +1,5 @@
-@Library('KOSi Pipeline Library@v3.3.2') _
+@Library
+('KOSi Pipeline Library@v3.3.2') _
 
 import groovy.transform.Field
 
@@ -13,6 +14,27 @@ def projectConfig = [
     projectName: 'siggen_toolkit',
     profiles: [ windows, linux ],
   	primaryNode: linux,
+    conanDependenciesRepos: [
+        'conan-local-truss',
+        'conan-local-ngc',
+        'conan-local-HVIcore',
+        'conan-local-rosetta',
+        'conan-local-vxt2',
+        'conan-local-mcs3',
+      	'conan-local-k3p',
+        'conan-local-pwic',
+      	'conan-local-cc',
+      	'conan-local-pwsg',
+      	'conan-local-ml',
+        'conan-local-kal',
+      	'conan-local-legacy',
+      	'conan-keysight',
+        'conan-remote-bincrafters',
+        'conan-remote-bintray' ],
+  	conanIncludeDefaultRepos: false,
+    npmRegistry: 'npm-keysight',
+    shouldPublish: true,
+    branchesToPublish: 'all',
   	cleanOnFailure: true,
     slack: [
         channel: '#proj-siggen_toolkit-ci',
