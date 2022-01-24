@@ -1,5 +1,5 @@
 [package]
-name = "siggen_toolkit"
+name = "sgt"
 version = "1.0.0"
 authors = ["Bradley Hutchinson <bradley.hutchinson@keysight.com>"]
 edition = "2021"
