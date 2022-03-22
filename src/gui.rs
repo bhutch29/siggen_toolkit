@@ -687,6 +687,10 @@ fn versions(ui: &mut Ui, frame: &mut epi::Frame<'_>, state: &mut VersionsState) 
                     ui.selectable_value(&mut state.selected_branch, branch.clone(), branch);
                 }
             });
+        columns[0].horizontal(|ui| {
+            ui.label("Download Directory:");
+            copyable_path(ui, &versions::download_dir(&state.selected_branch));
+        });
         columns[0].separator();
 
         if let Some(latest) = state.latest() {

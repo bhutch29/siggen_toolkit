@@ -201,11 +201,7 @@ impl VersionsClient {
         };
         let url = format!("{}/{}/{}/{}", BASE_FILE_URL, segments, branch, file_name);
 
-        let destination_dir = dirs::download_dir()
-            .unwrap_or(dirs::home_dir().ok_or(anyhow::anyhow!("Could not find Downloads or Home directories"))?)
-            .join("SigGen_Versions")
-            .join(branch);
-
+        let destination_dir = download_dir(branch);
         let file_name = file_name.to_string();
         let client = self.client.clone();
         std::thread::spawn(move || {
@@ -231,17 +227,16 @@ impl VersionsClient {
         path: &Path,
         status: Option<Arc<Mutex<RequestStatus>>>,
         repaint: Option<Arc<dyn RepaintSignal>>,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<std::thread::JoinHandle<()>> {
         let url = format!(
             "{}/{}/{}",
             BASE_FILE_URL,
             report_segments(),
             path.file_name().unwrap().to_string_lossy()
         );
-
         let client = self.client.clone();
         let path = PathBuf::from(path);
-        std::thread::spawn(move || {
+        let handle = std::thread::spawn(move || {
             if let Some(ref status) = status {
                 *status.lock().unwrap() = RequestStatus::InProgress;
             }
@@ -259,7 +254,7 @@ impl VersionsClient {
             }
         });
 
-        Ok(())
+        Ok(handle)
     }
 
     pub fn get_packages_info(&self, branch: &str) -> Vec<FileInfo> {
@@ -344,6 +339,13 @@ fn parse_children(response: ArtifactoryDirectory) -> Vec<String> {
         .iter()
         .map(|child| child.uri.trim_start_matches('/').to_string())
         .collect()
+}
+
+pub fn download_dir(branch: &str) -> PathBuf {
+    dirs::download_dir()
+        .unwrap_or(dirs::home_dir().unwrap())
+        .join("SigGen_Versions")
+        .join(branch)
 }
 
 fn download_internal(

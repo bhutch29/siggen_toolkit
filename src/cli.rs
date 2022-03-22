@@ -134,7 +134,10 @@ pub fn run(command: Command) -> anyhow::Result<()> {
             ReportCommand::Upload { name } => {
                 let file_name = report::zip_file_name(&name);
                 let client = versions::VersionsClient::default();
-                client.upload_report(Path::new(&file_name), None, None)?;
+                let handle = client.upload_report(Path::new(&file_name), None, None)?;
+                if handle.join().is_err() {
+                    return Err(anyhow::anyhow!("unknown error occurred when uploading"));
+                }
             }
         },
         Command::Events(cmd) => match cmd {
