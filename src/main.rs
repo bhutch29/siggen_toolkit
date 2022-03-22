@@ -1,4 +1,5 @@
-#![windows_subsystem = "windows"] // Hides console on Windows
+// TODO: This works to hide the console when launching the GUI but then hides the console output when using the CLI
+// #![windows_subsystem = "windows"] // Hides console on Windows
 
 mod cli;
 mod common;
