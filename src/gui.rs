@@ -924,7 +924,7 @@ pub fn run() -> anyhow::Result<()> {
                     width: icon_width,
                     height: icon_height,
                 }),
-                initial_window_size: Some(egui::Vec2::new(700.0, 700.0)),
+                initial_window_size: Some(egui::Vec2::new(800.0, 800.0)),
                 ..Default::default()
             }
         }

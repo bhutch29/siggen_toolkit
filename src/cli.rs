@@ -128,7 +128,7 @@ pub fn run(command: Command) -> anyhow::Result<()> {
                         file_name
                     ));
                 }
-                println!("File Name: {}", file_name);
+                println!("{}", file_name);
                 report::create_report(&name)?;
             }
             ReportCommand::Upload { name } => {
@@ -138,6 +138,12 @@ pub fn run(command: Command) -> anyhow::Result<()> {
                 if handle.join().is_err() {
                     return Err(anyhow::anyhow!("unknown error occurred when uploading"));
                 }
+                println!(
+                    "{}/{}/{}",
+                    versions::BASE_FILE_URL,
+                    versions::report_segments(),
+                    file_name
+                );
             }
         },
         Command::Events(cmd) => match cmd {
