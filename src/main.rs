@@ -10,6 +10,7 @@ mod hwconfig;
 mod logging;
 mod report;
 mod versions;
+mod ion_diagnostics;
 
 use cli::*;
 
