@@ -1,7 +1,5 @@
-#[cfg(windows)]
 use serde::{Serialize, Deserialize};
 
-#[cfg(windows)]
 #[derive(Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "PascalCase")]
 pub struct Provider {
@@ -10,14 +8,12 @@ pub struct Provider {
     pub event_source_name: Option<String>,
 }
 
-#[cfg(windows)]
 #[derive(Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "PascalCase")]
 pub struct TimeCreated {
     pub system_time: String,
 }
 
-#[cfg(windows)]
 #[derive(Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "PascalCase")]
 pub struct System {
@@ -32,7 +28,6 @@ pub struct System {
     extra: std::collections::HashMap<String, serde_json::Value>,
 }
 
-#[cfg(windows)]
 #[derive(Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "PascalCase")]
 pub struct Data {
@@ -40,7 +35,6 @@ pub struct Data {
     extra: std::collections::HashMap<String, serde_json::Value>,
 }
 
-#[cfg(windows)]
 #[derive(Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "PascalCase")]
 pub struct UserData {
@@ -48,14 +42,12 @@ pub struct UserData {
     extra: std::collections::HashMap<String, serde_json::Value>,
 }
 
-#[cfg(windows)]
 #[derive(Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "PascalCase")]
 pub struct EventData {
     data: Option<Vec<Data>>,
 }
 
-#[cfg(windows)]
 #[derive(Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "PascalCase")]
 pub struct MyEvent {
@@ -116,6 +108,11 @@ pub fn get_events() -> Result<Vec<MyEvent>, String> {
 }
 
 #[cfg(not(windows))]
-pub fn event_stuff() {
+pub fn print_event_stuff() {
     println!("Not supported on Linux");
+}
+
+#[cfg(not(windows))]
+pub fn get_events() -> Result<Vec<MyEvent>, String> {
+    Err("Not supported on Linux".to_string())
 }
