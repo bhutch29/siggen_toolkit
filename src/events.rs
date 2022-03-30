@@ -1,8 +1,8 @@
 #[cfg(windows)]
-use serde::Deserialize;
+use serde::{Serialize, Deserialize};
 
 #[cfg(windows)]
-#[derive(Deserialize, Default, Debug)]
+#[derive(Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "PascalCase")]
 struct Provider {
     pub name: String,
@@ -11,14 +11,14 @@ struct Provider {
 }
 
 #[cfg(windows)]
-#[derive(Deserialize, Default, Debug)]
+#[derive(Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "PascalCase")]
 struct TimeCreated {
     pub system_time: String,
 }
 
 #[cfg(windows)]
-#[derive(Deserialize, Default, Debug)]
+#[derive(Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "PascalCase")]
 struct System {
     pub provider: Provider,
@@ -33,7 +33,7 @@ struct System {
 }
 
 #[cfg(windows)]
-#[derive(Deserialize, Default, Debug)]
+#[derive(Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "PascalCase")]
 struct Data {
     #[serde(flatten)]
@@ -41,14 +41,14 @@ struct Data {
 }
 
 #[cfg(windows)]
-#[derive(Deserialize, Default, Debug)]
+#[derive(Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "PascalCase")]
 struct EventData {
     data: Option<Vec<Data>>,
 }
 
 #[cfg(windows)]
-#[derive(Deserialize, Default, Debug)]
+#[derive(Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "PascalCase")]
 struct MyEvent {
     pub system: System,
@@ -62,9 +62,12 @@ use win_event_log::prelude::*;
 pub fn event_stuff() {
     println!("Events Stuff!");
     let conditions = vec![
-        // Condition::filter(EventFilter::level(1, Comparison::Equal)),
-        Condition::filter(EventFilter::level(4, Comparison::GreaterThanOrEqual)),
-        // Condition::filter(EventFilter::provider("SigGen"))
+        Condition::or(vec![
+            // Condition::filter(EventFilter::level(1, Comparison::Equal)), // Critical
+            Condition::filter(EventFilter::level(2, Comparison::Equal)), // Error
+            // Condition::filter(EventFilter::level(3, Comparison::Equal)), // Warn
+            // Condition::filter(EventFilter::level(4, Comparison::Equal)) // Info
+        ])
     ];
     let query = QueryList::new()
         .with_query(
@@ -83,8 +86,12 @@ pub fn event_stuff() {
             for event in events {
                 println!();
                 println!("{}", event);
+                println!("------------");
                 let parsed: MyEvent = event.into();
+                println!("{}", serde_json::to_string_pretty(&parsed).unwrap());
+                println!("------------");
                 println!("{:?}", parsed);
+
                 // break;
             }
         }
