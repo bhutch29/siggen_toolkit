@@ -1,6 +1,6 @@
 [package]
 name = "sgt"
-version = "1.0.3"
+version = "1.0.4"
 authors = ["Bradley Hutchinson <bradley.hutchinson@keysight.com>"]
 edition = "2021"
 build = "build.rs"
