@@ -1,16 +1,15 @@
 use crate::cli::SimulatedChannel;
 use crate::common::in_cwd;
-use crate::gui_state::{
-    FilterOptions, HwconfigState, LoggingState, ReportsState, VersionsFilter, VersionsState, VersionsTypes,
-};
+use crate::gui_state::{FilterOptions, HwconfigState, IonDiagnosticsState, LoggingState, ReportsState, VersionsFilter, VersionsState, VersionsTypes};
 use crate::logging::{Bool, Level, Logger, Sink};
 use crate::versions::{FileInfo, RequestStatus, BASE_FILE_URL};
-use crate::{common, hwconfig, logging, report, versions};
+use crate::{common, hwconfig, ion_diagnostics, logging, report, versions};
 use clipboard::ClipboardProvider;
 use eframe::{egui, egui::Ui, epi};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use strum::{Display, EnumIter, IntoEnumIterator};
+use crate::ion_diagnostics::SettingsInstance;
 
 enum SinksAction {
     Remove(usize),
@@ -21,6 +20,8 @@ enum SinksAction {
 #[derive(PartialEq, Clone, Copy, EnumIter, Display)]
 enum Tabs {
     Logging,
+    #[strum(serialize = "Ion Diagnostics")]
+    IonDiagnostics,
     #[strum(serialize = "Hardware Configuration")]
     HwConfig,
     Packages,
@@ -36,6 +37,7 @@ struct GuiApp {
     packages: VersionsState,
     installers: VersionsState,
     reports: ReportsState,
+    diagnostics: IonDiagnosticsState,
 }
 
 impl Default for GuiApp {
@@ -46,6 +48,7 @@ impl Default for GuiApp {
             packages: VersionsState::new(VersionsTypes::Packages),
             installers: VersionsState::new(VersionsTypes::Installers),
             reports: Default::default(),
+            diagnostics: Default::default(),
             selected_tab: Some(Tabs::Logging),
         }
     }
@@ -101,6 +104,9 @@ impl epi::App for GuiApp {
                 Some(Tabs::Reports) => {
                     self.report(ui, frame);
                 }
+                Some(Tabs::IonDiagnostics) => {
+                    self.diagnostics(ui);
+                }
                 None => {
                     about(ui);
                 }
@@ -111,6 +117,10 @@ impl epi::App for GuiApp {
     fn setup(&mut self, _ctx: &egui::CtxRef, _frame: &mut epi::Frame<'_>, _storage: Option<&dyn epi::Storage>) {
         self.logger.config = logging::get_config_from(&logging::get_path_or_cwd()).unwrap_or_default();
         self.logger.loaded_from = Some(logging::get_path_or_cwd());
+
+        self.diagnostics.config = ion_diagnostics::get_config_from(&ion_diagnostics::get_path_or_cwd()).unwrap_or_default();
+        self.diagnostics.loaded_from = Some(ion_diagnostics::get_path_or_cwd());
+
         self.update_report_summary();
     }
 
@@ -650,6 +660,169 @@ impl GuiApp {
             }
         }
         action
+    }
+
+    fn diagnostics(&mut self, ui: &mut Ui) {
+        ui.heading("Ion Diagnostics");
+        ui.separator();
+        ui.strong("Paths indexed by Ion:");
+        for path in ion_diagnostics::valid_paths().iter() {
+            self.diagnostics_path(ui, path);
+        }
+        ui.strong("Current working directory:");
+        self.diagnostics_path(ui, &common::in_cwd(ion_diagnostics::FILE_NAME));
+        ui.strong("Custom:");
+        ui.horizontal(|ui| {
+            ui.text_edit_singleline(&mut self.diagnostics.custom_path);
+            self.diagnostics_path_buttons(ui, PathBuf::from(&self.diagnostics.custom_path));
+        });
+        ui.separator();
+
+        ui.columns(2, |columns| {
+            columns[0].heading("Settings");
+            columns[0].separator();
+
+            egui::ScrollArea::vertical()
+                .id_source("scroll_settings")
+                .show(&mut columns[0], |ui| {
+                    ui.heading("Global");
+
+                    ui.checkbox(&mut self.diagnostics.config.settings.global.all_enabled, "allEnabled");
+                    ui.checkbox(&mut self.diagnostics.config.settings.global.setting_resolve_enabled, "settingResolveEnabled");
+                    ui.checkbox(&mut self.diagnostics.config.settings.global.setting_set_enabled, "settingSetEnabled");
+                    ui.checkbox(&mut self.diagnostics.config.settings.global.setting_set_by_user_enabled, "settingSetByUserEnabled");
+                    ui.checkbox(&mut self.diagnostics.config.settings.global.setting_marked_enabled, "settingMarkedEnabled");
+                    ui.checkbox(&mut self.diagnostics.config.settings.global.setting_op_value_updated, "settingOpValueUpdated");
+                    ui.checkbox(&mut self.diagnostics.config.settings.global.this_setting_resolve_enabled, "thisSettingResolveEnabled");
+                    ui.checkbox(&mut self.diagnostics.config.settings.global.this_setting_set_enabled, "thisSettingSetEnabled");
+                    ui.checkbox(&mut self.diagnostics.config.settings.global.this_setting_set_by_user_enabled, "thisSettingSetByUserEnabled");
+                    ui.checkbox(&mut self.diagnostics.config.settings.global.this_setting_marked_enabled, "thisSettingMarkedEnabled");
+                    ui.checkbox(&mut self.diagnostics.config.settings.global.this_setting_op_value_updated, "thisSettingOpValueUpdated");
+                    ui.checkbox(&mut self.diagnostics.config.settings.global.setting_registered_with_gui, "settingRegisteredWithGui");
+                    ui.checkbox(&mut self.diagnostics.config.settings.global.setting_log_control_seos, "settingLogControlSeos");
+
+                    ui.separator();
+                    ui.heading("Instances");
+                    ui.horizontal(|ui| {
+                        ui.label("Create new Setting Instance:");
+                        if ui.button(" + ").clicked() {
+                            self.diagnostics.config.settings.instance.push(SettingsInstance::default());
+                        }
+                    });
+
+                    let mut instances_to_remove = Vec::new();
+
+                    for (i, instance) in self.diagnostics.config.settings.instance.iter_mut().enumerate() {
+                        ui.separator();
+                        ui.horizontal(|ui| {
+                            if ui.button(" x ").on_hover_text("Remove").clicked() {
+                                instances_to_remove.push(i);
+                            }
+                            ui.heading(i + 1);
+                        });
+
+                        ui.horizontal(|ui| {
+                            ui.label("Create new Setting Path:");
+                            if ui.button(" + ").clicked() {
+                                instance.setting_paths.push(String::default());
+                            }
+                        });
+
+                        let mut paths_to_remove = Vec::new();
+
+                        for (j, path) in instance.setting_paths.iter_mut().enumerate() {
+                            ui.horizontal(|ui| {
+                                ui.add(egui::TextEdit::singleline(path).hint_text("Pattern to match"));
+                                if ui.button(" x ").on_hover_text("Remove").clicked() {
+                                    paths_to_remove.push(j);
+                                }
+                            });
+
+                        }
+
+                        for index in paths_to_remove {
+                            instance.setting_paths.remove(index);
+                        }
+
+                        ui.checkbox(&mut instance.flags.trace_enabled, "traceEnabled");
+                        ui.checkbox(&mut instance.flags.break_on_set, "breakOnSet");
+                        ui.add(egui::Slider::new(&mut instance.flags.break_on_set_after_n, -1..=10).text("breakOnSetAfterN"));
+                        ui.checkbox(&mut instance.flags.break_on_set_by_user, "breakOnSetByUser");
+                        // ui.checkbox(&mut instance.flags.break_on_set_by_user_after_n, "breakOnSetByUserAfterN");
+                        ui.checkbox(&mut instance.flags.break_on_marked, "breakOnMarked");
+                        // ui.checkbox(&mut instance.flags.break_on_marked_after_n, "breakOnMarkedAfterN");
+                        ui.checkbox(&mut instance.flags.break_on_resolve, "breakOnResolve");
+                        // ui.checkbox(&mut instance.flags.break_on_resolve_after_n, "breakOnResolveAfterN");
+                    }
+
+                    for index in instances_to_remove {
+                       self.diagnostics.config.settings.instance.remove(index);
+                    }
+
+                });
+
+            columns[1].heading("Operations");
+            columns[1].separator();
+
+            egui::ScrollArea::vertical()
+                .id_source("scroll_operations")
+                .show(&mut columns[1], |ui| {
+                    ui.heading("Global");
+
+                    ui.checkbox(&mut self.diagnostics.config.operations.global.trace_all, "traceAll");
+                    ui.checkbox(&mut self.diagnostics.config.operations.global.trace_on_mark, "traceOnMark");
+                    ui.checkbox(&mut self.diagnostics.config.operations.global.trace_on_resolve, "traceOnResolve");
+                    ui.checkbox(&mut self.diagnostics.config.operations.global.trace_on_abort, "traceOnAbort");
+                    ui.checkbox(&mut self.diagnostics.config.operations.global.trace_on_remove, "traceOnRemove");
+                    ui.checkbox(&mut self.diagnostics.config.operations.global.trace_on_add, "traceOnAdd");
+                    ui.checkbox(&mut self.diagnostics.config.operations.global.trace_on_bind, "traceOnBind");
+
+                    ui.separator();
+                    ui.heading("Instances");
+                });
+        });
+    }
+
+    fn diagnostics_path(&mut self, ui: &mut Ui, path: &Path) {
+        ui.horizontal(|ui| {
+            copyable_path(ui, path);
+            self.diagnostics_path_buttons(ui, PathBuf::from(path));
+        });
+    }
+
+    fn diagnostics_path_buttons(&mut self, ui: &mut Ui, path: PathBuf) {
+        ui.label(if self.diagnostics.loaded_from.as_ref() == Some(&path) {
+            "⬅"
+        } else {
+            "     "
+        });
+
+        let exists = path.exists() && path.is_file();
+        if ui.add_enabled(exists, egui::Button::new("Load")).clicked() {
+            self.diagnostics.config = ion_diagnostics::get_config_from(&path).unwrap_or_default();
+            self.diagnostics.loaded_from = Some(path.clone());
+        }
+        if ui.button("Save").clicked() {
+            self.diagnostics.remove_error = false;
+            self.diagnostics.write_error = ion_diagnostics::set_config(&path, self.diagnostics.config.clone()).is_err();
+            if !self.diagnostics.write_error {
+                self.diagnostics.loaded_from = Some(path.clone());
+            }
+        }
+        if ui.add_enabled(exists, egui::Button::new("Delete")).clicked() {
+            self.diagnostics.write_error = false;
+            self.diagnostics.remove_error = std::fs::remove_file(&path).is_err();
+            if self.diagnostics.loaded_from == Some(path) {
+                self.diagnostics.loaded_from = None;
+            }
+        }
+
+        if self.diagnostics.write_error {
+            error_label(ui, "Error writing configuration to file");
+        }
+        if self.diagnostics.remove_error {
+            error_label(ui, "Error removing file");
+        }
     }
 }
 

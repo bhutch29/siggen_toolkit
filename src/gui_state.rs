@@ -5,6 +5,7 @@ use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use crate::ion_diagnostics::DiagnosticsConfiguration;
 
 pub struct HwconfigState {
     pub channel_count: u8,
@@ -27,6 +28,15 @@ impl Default for HwconfigState {
 #[derive(Default)]
 pub struct LoggingState {
     pub config: LoggingConfiguration,
+    pub custom_path: String,
+    pub loaded_from: Option<PathBuf>,
+    pub write_error: bool,
+    pub remove_error: bool,
+}
+
+#[derive(Default)]
+pub struct IonDiagnosticsState {
+    pub config: DiagnosticsConfiguration,
     pub custom_path: String,
     pub loaded_from: Option<PathBuf>,
     pub write_error: bool,
