@@ -216,6 +216,7 @@ pub fn as_negative_one() -> i32 {
 
 pub const FILE_NAME: &str = "ionDebug.json";
 pub const ENV_VAR: &str = "ION_DEBUG_DIR";
+pub const CONFLUENCE_URL: &str = "https://confluence.it.keysight.com/display/PWL/Ion+Diagnostics";
 
 pub fn get_config_from(path: &Path) -> Option<DiagnosticsConfiguration> {
     std::fs::read_to_string(path)

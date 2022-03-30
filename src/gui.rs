@@ -690,7 +690,10 @@ impl GuiApp {
     }
 
     fn diagnostics(&mut self, ui: &mut Ui) {
-        ui.heading("Ion Diagnostics");
+        ui.horizontal(|ui| {
+            ui.heading("Ion Diagnostics");
+            ui.hyperlink_to("Confluence Page", ion_diagnostics::CONFLUENCE_URL);
+        });
         ui.separator();
         if self.diagnostics.ion_debug_dir.is_none() {
             ui.label(format!("{} environment variable must be set!", ion_diagnostics::ENV_VAR));
