@@ -9,7 +9,7 @@ use eframe::{egui, egui::Ui, epi};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use strum::{Display, EnumIter, IntoEnumIterator};
-use crate::ion_diagnostics::SettingsInstance;
+use crate::ion_diagnostics::{OperationsInstance, SettingsInstance};
 
 enum SinksAction {
     Remove(usize),
@@ -118,8 +118,13 @@ impl epi::App for GuiApp {
         self.logger.config = logging::get_config_from(&logging::get_path_or_cwd()).unwrap_or_default();
         self.logger.loaded_from = Some(logging::get_path_or_cwd());
 
-        self.diagnostics.config = ion_diagnostics::get_config_from(&ion_diagnostics::get_path_or_cwd()).unwrap_or_default();
-        self.diagnostics.loaded_from = Some(ion_diagnostics::get_path_or_cwd());
+        self.diagnostics.ion_debug_dir = std::env::var(ion_diagnostics::ENV_VAR).ok().map(|x| PathBuf::from(x).join(ion_diagnostics::FILE_NAME));
+        let path = match self.diagnostics.ion_debug_dir.clone() {
+            Some(x) if x.exists() => { x }
+            _ => { in_cwd(ion_diagnostics::FILE_NAME) }
+        };
+        self.diagnostics.config = ion_diagnostics::get_config_from(&path).unwrap_or_default();
+        self.diagnostics.loaded_from = Some(path);
 
         self.update_report_summary();
     }
@@ -665,10 +670,13 @@ impl GuiApp {
     fn diagnostics(&mut self, ui: &mut Ui) {
         ui.heading("Ion Diagnostics");
         ui.separator();
-        ui.strong("Paths indexed by Ion:");
-        for path in ion_diagnostics::valid_paths().iter() {
-            self.diagnostics_path(ui, path);
+        if self.diagnostics.ion_debug_dir.is_none() {
+            ui.label(format!("{} environment variable must be set!", ion_diagnostics::ENV_VAR));
+            ui.label("Configure the environment variable then rerun this application.");
+            return
         }
+        ui.strong("Paths indexed by Ion:");
+        self.diagnostics_path(ui, &self.diagnostics.ion_debug_dir.clone().unwrap());
         ui.strong("Current working directory:");
         self.diagnostics_path(ui, &common::in_cwd(ion_diagnostics::FILE_NAME));
         ui.strong("Custom:");
@@ -748,11 +756,11 @@ impl GuiApp {
                         ui.checkbox(&mut instance.flags.break_on_set, "breakOnSet");
                         ui.add(egui::Slider::new(&mut instance.flags.break_on_set_after_n, -1..=10).text("breakOnSetAfterN"));
                         ui.checkbox(&mut instance.flags.break_on_set_by_user, "breakOnSetByUser");
-                        // ui.checkbox(&mut instance.flags.break_on_set_by_user_after_n, "breakOnSetByUserAfterN");
+                        ui.add(egui::Slider::new(&mut instance.flags.break_on_set_by_user_after_n, -1..=10).text("breakOnSetByUserAfterN"));
                         ui.checkbox(&mut instance.flags.break_on_marked, "breakOnMarked");
-                        // ui.checkbox(&mut instance.flags.break_on_marked_after_n, "breakOnMarkedAfterN");
+                        ui.add(egui::Slider::new(&mut instance.flags.break_on_marked_after_n, -1..=10).text("breakOnMarkedAfterN"));
                         ui.checkbox(&mut instance.flags.break_on_resolve, "breakOnResolve");
-                        // ui.checkbox(&mut instance.flags.break_on_resolve_after_n, "breakOnResolveAfterN");
+                        ui.add(egui::Slider::new(&mut instance.flags.break_on_resolve_after_n, -1..=10).text("breakOnResolvedAfterN"));
                     }
 
                     for index in instances_to_remove {
@@ -779,6 +787,57 @@ impl GuiApp {
 
                     ui.separator();
                     ui.heading("Instances");
+                    ui.horizontal(|ui| {
+                        ui.label("Create new Operations Instance:");
+                        if ui.button(" + ").clicked() {
+                            self.diagnostics.config.operations.instance.push(OperationsInstance::default());
+                        }
+                    });
+
+                    let mut instances_to_remove = Vec::new();
+
+                    for (i, instance) in self.diagnostics.config.operations.instance.iter_mut().enumerate() {
+                        ui.separator();
+                        ui.horizontal(|ui| {
+                            if ui.button(" x ").on_hover_text("Remove").clicked() {
+                                instances_to_remove.push(i);
+                            }
+                            ui.heading(i + 1);
+                        });
+
+                        ui.horizontal(|ui| {
+                            ui.label("Create new Operation Name:");
+                            if ui.button(" + ").clicked() {
+                                instance.names.push(String::default());
+                            }
+                        });
+
+                        let mut paths_to_remove = Vec::new();
+
+                        for (j, path) in instance.names.iter_mut().enumerate() {
+                            ui.horizontal(|ui| {
+                                ui.add(egui::TextEdit::singleline(path).hint_text("Operation name"));
+                                if ui.button(" x ").on_hover_text("Remove").clicked() {
+                                    paths_to_remove.push(j);
+                                }
+                            });
+                        }
+
+                        ui.checkbox(&mut instance.flags.trace_all, "traceAll");
+                        ui.checkbox(&mut instance.flags.trace_on_mark, "traceOnMark");
+                        ui.checkbox(&mut instance.flags.trace_on_resolve, "traceOnResolve");
+                        ui.checkbox(&mut instance.flags.trace_on_abort, "traceOnAbort");
+                        ui.checkbox(&mut instance.flags.trace_on_remove, "traceOnRemove");
+                        ui.checkbox(&mut instance.flags.trace_on_add, "traceOnAdd");
+                        ui.checkbox(&mut instance.flags.trace_on_bind, "traceOnBind");
+                        ui.checkbox(&mut instance.flags.break_on_mark, "breakOnMark");
+                        ui.add(egui::Slider::new(&mut instance.flags.break_on_mark_after_n, -1..=10).text("breakOnMarkAfterN"));
+                        ui.checkbox(&mut instance.flags.break_on_abort, "breakOnAbort");
+                    }
+
+                    for index in instances_to_remove {
+                        self.diagnostics.config.operations.instance.remove(index);
+                    }
                 });
         });
     }

@@ -41,6 +41,7 @@ pub struct IonDiagnosticsState {
     pub loaded_from: Option<PathBuf>,
     pub write_error: bool,
     pub remove_error: bool,
+    pub ion_debug_dir: Option<PathBuf>,
 }
 
 /// Recursive data structure. Intended to hold Major, Minor, and Patch versions as keys in nested maps
