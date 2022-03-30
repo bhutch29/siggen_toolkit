@@ -1,4 +1,4 @@
-use crate::{hwconfig, logging, versions};
+use crate::{events, hwconfig, logging, versions};
 use std::fmt::Write as fmtWrite;
 use std::io::{Read, Write};
 use std::path::PathBuf;
@@ -61,7 +61,10 @@ pub fn create_report(name: &str) -> anyhow::Result<()> {
         add_file(&mut zip, path)?;
     }
 
-    // TODO: events
+    if let Ok(events) = events::get_events() {
+        zip.start_file("events.txt", Default::default())?;
+        zip.write_all(serde_json::to_string_pretty(&events).unwrap_or_default().as_bytes())?;
+    }
 
     zip.start_file("summary.txt", Default::default())?;
     zip.write_all(summary.as_bytes())?;

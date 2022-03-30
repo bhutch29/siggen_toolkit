@@ -1,9 +1,9 @@
 use crate::cli::SimulatedChannel;
 use crate::common::in_cwd;
-use crate::gui_state::{FilterOptions, HwconfigState, IonDiagnosticsState, LoggingState, ReportsState, VersionsFilter, VersionsState, VersionsTypes};
+use crate::gui_state::{EventsState, FilterOptions, HwconfigState, IonDiagnosticsState, LoggingState, ReportsState, VersionsFilter, VersionsState, VersionsTypes};
 use crate::logging::{Bool, Level, Logger, Sink};
 use crate::versions::{FileInfo, RequestStatus, BASE_FILE_URL};
-use crate::{common, hwconfig, ion_diagnostics, logging, report, versions};
+use crate::{common, events, hwconfig, ion_diagnostics, logging, report, versions};
 use clipboard::ClipboardProvider;
 use eframe::{egui, egui::Ui, epi};
 use std::collections::BTreeMap;
@@ -36,6 +36,7 @@ struct GuiApp {
     logger: LoggingState,
     packages: VersionsState,
     installers: VersionsState,
+    events: EventsState,
     reports: ReportsState,
     diagnostics: IonDiagnosticsState,
 }
@@ -47,6 +48,7 @@ impl Default for GuiApp {
             logger: Default::default(),
             packages: VersionsState::new(VersionsTypes::Packages),
             installers: VersionsState::new(VersionsTypes::Installers),
+            events: Default::default(),
             reports: Default::default(),
             diagnostics: Default::default(),
             selected_tab: Some(Tabs::Logging),
@@ -127,6 +129,8 @@ impl epi::App for GuiApp {
         self.diagnostics.loaded_from = Some(path);
 
         self.update_report_summary();
+
+        self.events.cache = events::get_events();
     }
 
     fn name(&self) -> &str {
@@ -357,12 +361,30 @@ impl GuiApp {
     }
 
     fn events(&mut self, ui: &mut Ui) {
-        ui.heading("Events");
+        ui.heading("Events (WIP)");
         ui.separator();
         if !cfg!(windows) {
             ui.label("Event Log is only supported on Windows.");
         } else {
-            ui.label("Event Log UI is currently under development.");
+            egui::ScrollArea::vertical()
+                .id_source("scroll_sinks")
+                .show(ui, |ui| {
+                    match &self.events.cache {
+                        Ok(events) => {
+                            for event in events {
+                                ui.horizontal(|ui| {
+                                    ui.label(event.system.level);
+                                    ui.label(&event.system.provider.name);
+                                    ui.label(&event.system.time_created.system_time);
+                                });
+                            }
+                        }
+                        Err(msg) => { ui.label(msg); }
+                    };
+
+                });
+
+
             // TODO
         }
     }

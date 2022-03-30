@@ -5,6 +5,7 @@ use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use crate::events::MyEvent;
 use crate::ion_diagnostics::DiagnosticsConfiguration;
 
 pub struct HwconfigState {
@@ -53,6 +54,18 @@ pub struct FilterOptions {
 impl FilterOptions {
     pub fn new(next: BTreeMap<u16, FilterOptions>) -> Self {
         Self { next }
+    }
+}
+
+pub struct EventsState {
+    pub cache: Result<Vec<MyEvent>, String>
+}
+
+impl Default for EventsState {
+    fn default() -> Self {
+        Self {
+            cache: Err("Unknown Error".to_string())
+        }
     }
 }
 

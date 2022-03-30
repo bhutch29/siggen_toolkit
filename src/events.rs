@@ -4,7 +4,7 @@ use serde::{Serialize, Deserialize};
 #[cfg(windows)]
 #[derive(Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "PascalCase")]
-struct Provider {
+pub struct Provider {
     pub name: String,
     pub guid: Option<String>,
     pub event_source_name: Option<String>,
@@ -13,14 +13,14 @@ struct Provider {
 #[cfg(windows)]
 #[derive(Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "PascalCase")]
-struct TimeCreated {
+pub struct TimeCreated {
     pub system_time: String,
 }
 
 #[cfg(windows)]
 #[derive(Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "PascalCase")]
-struct System {
+pub struct System {
     pub provider: Provider,
     pub time_created: TimeCreated,
     pub level: u16,
@@ -35,7 +35,7 @@ struct System {
 #[cfg(windows)]
 #[derive(Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "PascalCase")]
-struct Data {
+pub struct Data {
     #[serde(flatten)]
     extra: std::collections::HashMap<String, serde_json::Value>,
 }
@@ -43,24 +43,48 @@ struct Data {
 #[cfg(windows)]
 #[derive(Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "PascalCase")]
-struct EventData {
+pub struct UserData {
+    #[serde(flatten)]
+    extra: std::collections::HashMap<String, serde_json::Value>,
+}
+
+#[cfg(windows)]
+#[derive(Serialize, Deserialize, Default, Debug)]
+#[serde(rename_all = "PascalCase")]
+pub struct EventData {
     data: Option<Vec<Data>>,
 }
 
 #[cfg(windows)]
 #[derive(Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "PascalCase")]
-struct MyEvent {
+pub struct MyEvent {
     pub system: System,
-    pub event_data: EventData,
+    pub event_data: Option<EventData>,
+    pub user_data: Option<UserData>
 }
 
 #[cfg(windows)]
 use win_event_log::prelude::*;
 
 #[cfg(windows)]
-pub fn event_stuff() {
+pub fn print_event_stuff() {
     println!("Events Stuff!");
+    match get_events() {
+        Ok(events) => {
+            for event in events {
+                println!();
+                println!("{}", serde_json::to_string_pretty(&event).unwrap());
+                println!("------------");
+                println!("{:?}", event);
+            }
+        }
+        Err(e) => println!("Error: {}", e),
+    }
+}
+
+#[cfg(windows)]
+pub fn get_events() -> Result<Vec<MyEvent>, String> {
     let conditions = vec![
         Condition::or(vec![
             // Condition::filter(EventFilter::level(1, Comparison::Equal)), // Critical
@@ -81,22 +105,14 @@ pub fn event_stuff() {
         )
         .build();
 
-    match WinEvents::get(query) {
-        Ok(events) => {
-            for event in events {
-                println!();
-                println!("{}", event);
-                println!("------------");
-                let parsed: MyEvent = event.into();
-                println!("{}", serde_json::to_string_pretty(&parsed).unwrap());
-                println!("------------");
-                println!("{:?}", parsed);
-
-                // break;
-            }
+    WinEvents::get(query).map(|events| {
+        let mut my_events = Vec::new();
+        for event in events {
+            let parsed: MyEvent = event.into(); // TODO: improve failure handling
+            my_events.push(parsed);
         }
-        Err(e) => println!("Error: {}", e),
-    }
+        my_events
+    })
 }
 
 #[cfg(not(windows))]

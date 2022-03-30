@@ -148,7 +148,7 @@ pub fn run(command: Command) -> anyhow::Result<()> {
         },
         Command::Events(cmd) => match cmd {
             EventsCommand::List { .. } => {
-                events::event_stuff();
+                events::print_event_stuff();
             }
         },
     };
