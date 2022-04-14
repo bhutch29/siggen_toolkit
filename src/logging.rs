@@ -147,7 +147,7 @@ pub enum Level {
     Debug,
     Info,
     Warn,
-    Error,
+    Err,
     Critical,
     Off,
 }
