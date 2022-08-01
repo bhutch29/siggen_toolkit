@@ -1,24 +1,24 @@
-use crate::{cli, SimulatedChannel};
+use crate::SimulatedChannel;
 use crate::common::*;
 use std::path::{Path, PathBuf};
 
-fn serialize_channel(channel: &cli::SimulatedChannel) -> String {
+fn serialize_channel(channel: &SimulatedChannel) -> String {
     match channel {
-        cli::SimulatedChannel::MCS15 => "hwPlatform=MCS15".to_string(),
-        cli::SimulatedChannel::MCS31 { has_io_extender } => {
+        SimulatedChannel::MCS15 => "hwPlatform=MCS15".to_string(),
+        SimulatedChannel::MCS31 { has_io_extender } => {
             format!("hwPlatform=MCS3;{}", if *has_io_extender {"hasIoExtender=true"} else {""})
         }
     }
 }
 
-fn serialize_channels(channels: Vec<cli::SimulatedChannel>) -> String {
+fn serialize_channels(channels: Vec<SimulatedChannel>) -> String {
     channels
         .iter()
         .map(|channel| format!("simulated {}\n", serialize_channel(channel)))
         .collect()
 }
 
-pub fn serialize_hwconfig(config: cli::SimulatedChannel, channel_count: u8, has_io_extender: bool) -> String {
+pub fn serialize_hwconfig(config: SimulatedChannel, channel_count: u8, has_io_extender: bool) -> String {
     let mut channels = vec![config; channel_count as usize];
     if has_io_extender {
         let first = channels[0];
@@ -61,7 +61,7 @@ pub fn valid_paths() -> Vec<PathBuf> {
     .collect()
 }
 
-pub fn set(path: &Path, config: cli::SimulatedChannel, channel_count: u8, has_io_extender: bool) -> anyhow::Result<()> {
+pub fn set(path: &Path, config: SimulatedChannel, channel_count: u8, has_io_extender: bool) -> anyhow::Result<()> {
     std::fs::create_dir_all(path.parent().unwrap())
         .and_then(|_| std::fs::write(path, &serialize_hwconfig(config, channel_count, has_io_extender)))?;
     Ok(())

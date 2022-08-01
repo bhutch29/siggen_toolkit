@@ -397,7 +397,7 @@ impl GuiApp {
             self.hwconfig_path(ui, path);
         }
         ui.strong("Current working directory:");
-        self.hwconfig_path(ui, &common::in_cwd(hwconfig::FILE_NAME));
+        self.hwconfig_path(ui, &in_cwd(hwconfig::FILE_NAME));
         ui.separator();
 
         ui.heading("Simulated Hardware Configuration");
@@ -476,7 +476,7 @@ impl GuiApp {
             self.logging_path(ui, path);
         }
         ui.strong("Current working directory:");
-        self.logging_path(ui, &common::in_cwd(logging::FILE_NAME));
+        self.logging_path(ui, &in_cwd(logging::FILE_NAME));
         ui.strong("Custom:");
         ui.horizontal(|ui| {
             ui.text_edit_singleline(&mut self.logger.custom_path);
@@ -689,7 +689,7 @@ impl GuiApp {
         ui.strong("Paths indexed by Ion:");
         self.diagnostics_path(ui, &self.diagnostics.ion_debug_dir.clone().unwrap());
         ui.strong("Current working directory:");
-        self.diagnostics_path(ui, &common::in_cwd(ion_diagnostics::FILE_NAME));
+        self.diagnostics_path(ui, &in_cwd(ion_diagnostics::FILE_NAME));
         ui.strong("Custom:");
         ui.horizontal(|ui| {
             ui.text_edit_singleline(&mut self.diagnostics.custom_path);
@@ -1162,7 +1162,7 @@ pub fn run() -> anyhow::Result<()> {
             let (icon_width, icon_height) = icon.dimensions();
 
             eframe::NativeOptions {
-                icon_data: Some(eframe::epi::IconData {
+                icon_data: Some(epi::IconData {
                     rgba: icon.into_raw(),
                     width: icon_width,
                     height: icon_height,
