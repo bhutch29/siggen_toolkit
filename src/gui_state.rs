@@ -11,6 +11,7 @@ use crate::ion_diagnostics::DiagnosticsConfiguration;
 pub struct HwconfigState {
     pub channel_count: u8,
     pub platform: SimulatedChannel,
+    pub has_io_extender: bool,
     pub write_error: bool,
     pub remove_error: bool,
 }
@@ -19,7 +20,8 @@ impl Default for HwconfigState {
     fn default() -> Self {
         Self {
             channel_count: 1,
-            platform: SimulatedChannel::MCS31 { signal_count: 1 },
+            platform: SimulatedChannel::MCS31 {has_io_extender: false},
+            has_io_extender: false,
             write_error: false,
             remove_error: false,
         }

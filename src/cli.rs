@@ -58,6 +58,8 @@ pub enum HwConfigCommand {
     Set {
         #[structopt(default_value = "2", short, long)]
         channel_count: u8,
+        #[structopt(short, long)]
+        has_io_extender: bool,
         #[structopt(subcommand)]
         config: SimulatedChannel,
     },
@@ -73,22 +75,22 @@ pub enum SimulatedChannel {
     #[strum(serialize = "MCS3.1")]
     #[structopt(name = "MCS3")]
     MCS31 {
-        #[structopt(default_value = "8", short, long)]
-        signal_count: u8,
+        #[structopt(short, long)]
+        has_io_extender: bool,
     },
 }
 
 impl Default for SimulatedChannel {
     fn default() -> Self {
-        Self::MCS31 { signal_count: 1 }
+        Self::MCS31 {has_io_extender: false}
     }
 }
 
 pub fn run(command: Command) -> anyhow::Result<()> {
     match command {
         Command::HwConfig(cmd) => match cmd {
-            HwConfigCommand::Set { config, channel_count } => {
-                hwconfig::set(&hwconfig::get_path_or_cwd(), config, channel_count)?
+            HwConfigCommand::Set { config, channel_count, has_io_extender } => {
+                hwconfig::set(&hwconfig::get_path_or_cwd(), config, channel_count, has_io_extender)?
             }
             HwConfigCommand::Restore => println!("Not yet implemented!"),
             HwConfigCommand::Show => match hwconfig::read_from(&hwconfig::get_path_or_cwd()) {

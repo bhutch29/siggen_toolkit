@@ -404,13 +404,14 @@ impl GuiApp {
         self.platform_dropdown(ui);
         self.channel_count_selector(ui);
         if let SimulatedChannel::MCS31 { .. } = self.hwconfig.platform {
-            self.signal_count_selector(ui);
+            ui.checkbox(&mut self.hwconfig.has_io_extender, "Include IO Extender on first channel");
         }
         ui.add_enabled(
             false,
             egui::TextEdit::multiline(&mut hwconfig::serialize_hwconfig(
                 self.hwconfig.platform,
                 self.hwconfig.channel_count,
+                self.hwconfig.has_io_extender
             )),
         );
     }
@@ -425,7 +426,7 @@ impl GuiApp {
     fn hwconfig_path_buttons(&mut self, ui: &mut Ui, path: &Path) {
         if ui.button("Save").clicked() {
             self.hwconfig.write_error =
-                hwconfig::set(path, self.hwconfig.platform, self.hwconfig.channel_count).is_err();
+                hwconfig::set(path, self.hwconfig.platform, self.hwconfig.channel_count, self.hwconfig.has_io_extender).is_err();
             self.hwconfig.remove_error = false;
         }
         if ui
@@ -449,23 +450,8 @@ impl GuiApp {
             ui.selectable_value(&mut self.hwconfig.channel_count, 1, "1");
             ui.selectable_value(&mut self.hwconfig.channel_count, 2, "2");
             ui.selectable_value(&mut self.hwconfig.channel_count, 4, "4");
+            ui.selectable_value(&mut self.hwconfig.channel_count, 8, "8");
             ui.label("Number of Channels");
-        });
-    }
-
-    fn signal_count_selector(&mut self, ui: &mut Ui) {
-        ui.horizontal(|ui| {
-            ui.selectable_value(
-                &mut self.hwconfig.platform,
-                SimulatedChannel::MCS31 { signal_count: 1 },
-                "1",
-            );
-            ui.selectable_value(
-                &mut self.hwconfig.platform,
-                SimulatedChannel::MCS31 { signal_count: 8 },
-                "8",
-            );
-            ui.label("Signals per Channel");
         });
     }
 
@@ -475,7 +461,7 @@ impl GuiApp {
             .show_ui(ui, |ui| {
                 ui.selectable_value(
                     &mut self.hwconfig.platform,
-                    SimulatedChannel::MCS31 { signal_count: 0 },
+                    SimulatedChannel::MCS31 { has_io_extender: false },
                     "MCS3.1",
                 );
                 ui.selectable_value(&mut self.hwconfig.platform, SimulatedChannel::MCS15, "MCS1.5");
