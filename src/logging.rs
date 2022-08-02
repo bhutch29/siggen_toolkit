@@ -177,7 +177,7 @@ pub fn valid_paths() -> Vec<PathBuf> {
     } else {
         vec![dirs::home_dir()]
     }
-    .into_iter()
+    .iter()
     .flatten()
     .map(|x| {
         x.join("Keysight")

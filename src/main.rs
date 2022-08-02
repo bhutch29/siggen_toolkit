@@ -11,6 +11,7 @@ mod logging;
 mod report;
 mod versions;
 mod ion_diagnostics;
+mod log_viewer;
 
 use cli::*;
 

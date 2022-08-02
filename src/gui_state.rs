@@ -3,10 +3,13 @@ use crate::logging::LoggingConfiguration;
 use crate::versions::{develop_branch, parse_semver, FileInfo, RequestStatus, SemVer, VersionsClient};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
+use std::fs::File;
+use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use crate::events::MyEvent;
 use crate::ion_diagnostics::DiagnosticsConfiguration;
+use crate::log_viewer;
 
 pub struct HwconfigState {
     pub channel_count: u8,
@@ -264,5 +267,44 @@ impl VersionsState {
             None => RequestStatus::Idle,
             Some(status) => status.lock().unwrap().clone(),
         }
+    }
+}
+
+pub struct LogViewerState {
+    pub source: log_viewer::Source,
+    pub file_path: String,
+    pub stdin_data: Arc<Mutex<log_viewer::Data>>,
+    pub file_data: Arc<Mutex<log_viewer::Data>>,
+}
+
+impl Default for LogViewerState {
+    fn default() -> Self {
+        Self {
+            source: log_viewer::Source::Stdin,
+            file_path: String::from("/home/bhutch/ksflogger.txt"),
+            stdin_data: Arc::new(Mutex::new(Default::default())),
+            file_data: Arc::new(Mutex::new(Default::default())),
+        }
+    }
+}
+
+impl LogViewerState {
+    pub fn load_file_data(&mut self) {
+        let path = PathBuf::from(self.file_path.clone());
+        if !path.exists() {
+            // TODO
+            return;
+        }
+
+        let file = File::open(path).unwrap(); // TODO: error handling
+        let reader = BufReader::new(file);
+
+        let data = self.file_data.clone();
+        std::thread::spawn(move || {
+            data.lock().unwrap().clear();
+            for (_, line) in reader.lines().enumerate() {
+                data.lock().unwrap().push(line.unwrap()); // TODO: error handling
+            }
+        });
     }
 }

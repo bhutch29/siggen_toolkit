@@ -1,9 +1,9 @@
 use crate::cli::SimulatedChannel;
 use crate::common::in_cwd;
-use crate::gui_state::{EventsState, FilterOptions, HwconfigState, IonDiagnosticsState, LoggingState, ReportsState, VersionsFilter, VersionsState, VersionsTypes};
+use crate::gui_state::{EventsState, FilterOptions, HwconfigState, IonDiagnosticsState, LoggingState, LogViewerState, ReportsState, VersionsFilter, VersionsState, VersionsTypes};
 use crate::logging::{Bool, Level, Logger, Sink};
 use crate::versions::{FileInfo, RequestStatus, BASE_FILE_URL};
-use crate::{common, events, hwconfig, ion_diagnostics, logging, report, versions};
+use crate::{common, events, hwconfig, ion_diagnostics, log_viewer, logging, report, versions};
 use clipboard::ClipboardProvider;
 use eframe::{egui, egui::Ui, epi};
 use std::collections::BTreeMap;
@@ -19,11 +19,14 @@ enum SinksAction {
 
 #[derive(PartialEq, Clone, Copy, EnumIter, Display)]
 enum Tabs {
-    Logging,
+    #[strum(serialize = "Logging Configuration")]
+    LoggingConfiguration,
     #[strum(serialize = "Ion Diagnostics")]
     IonDiagnostics,
     #[strum(serialize = "Hardware Configuration")]
     HwConfig,
+    #[strum(serialize = "Log Viewer")]
+    LogViewer,
     Packages,
     Installers,
     Events,
@@ -34,6 +37,7 @@ struct GuiApp {
     selected_tab: Option<Tabs>,
     hwconfig: HwconfigState,
     logger: LoggingState,
+    log_viewer: LogViewerState,
     packages: VersionsState,
     installers: VersionsState,
     events: EventsState,
@@ -46,12 +50,13 @@ impl Default for GuiApp {
         Self {
             hwconfig: Default::default(),
             logger: Default::default(),
+            log_viewer: Default::default(),
             packages: VersionsState::new(VersionsTypes::Packages),
             installers: VersionsState::new(VersionsTypes::Installers),
             events: Default::default(),
             reports: Default::default(),
             diagnostics: Default::default(),
-            selected_tab: Some(Tabs::Logging),
+            selected_tab: Some(Tabs::LoggingConfiguration),
         }
     }
 }
@@ -91,7 +96,7 @@ impl epi::App for GuiApp {
                 Some(Tabs::HwConfig) => {
                     self.hwconfig(ui);
                 }
-                Some(Tabs::Logging) => {
+                Some(Tabs::LoggingConfiguration) => {
                     self.logging(ui);
                 }
                 Some(Tabs::Packages) => {
@@ -109,6 +114,9 @@ impl epi::App for GuiApp {
                 Some(Tabs::IonDiagnostics) => {
                     self.diagnostics(ui);
                 }
+                Some(Tabs::LogViewer) => {
+                    self.log_viewer(ui);
+                }
                 None => {
                     about(ui);
                 }
@@ -116,7 +124,7 @@ impl epi::App for GuiApp {
         });
     }
 
-    fn setup(&mut self, _ctx: &egui::CtxRef, _frame: &mut epi::Frame<'_>, _storage: Option<&dyn epi::Storage>) {
+    fn setup(&mut self, _ctx: &egui::CtxRef, frame: &mut epi::Frame<'_>, _storage: Option<&dyn epi::Storage>) {
         self.logger.config = logging::get_config_from(&logging::get_path_or_cwd()).unwrap_or_default();
         self.logger.loaded_from = Some(logging::get_path_or_cwd());
 
@@ -131,6 +139,11 @@ impl epi::App for GuiApp {
         self.update_report_summary();
 
         self.events.cache = events::get_events();
+
+        let stdin_data = self.log_viewer.stdin_data.clone();
+        let repaint = frame.repaint_signal().clone();
+
+        log_viewer::watch_stdin(stdin_data, repaint);
     }
 
     fn name(&self) -> &str {
@@ -893,6 +906,39 @@ impl GuiApp {
         if self.diagnostics.remove_error {
             error_label(ui, "Error removing file");
         }
+    }
+
+    fn log_viewer(&mut self, ui: &mut Ui) {
+        ui.heading("Log Viewer (WIP)");
+
+        egui::ComboBox::from_label("Log Source")
+            .selected_text(format!("{}", self.log_viewer.source))
+            .show_ui(ui, |ui| {
+                ui.selectable_value(&mut self.log_viewer.source, log_viewer::Source::Stdin, "Stdin");
+                ui.selectable_value(&mut self.log_viewer.source, log_viewer::Source::File, "File");
+            });
+
+        match self.log_viewer.source {
+            log_viewer::Source::Stdin => {
+            }
+            log_viewer::Source::File => {
+                ui.strong("Path:");
+                ui.text_edit_singleline(&mut self.log_viewer.file_path);
+                if ui.button("Load").clicked() {
+                    self.log_viewer.load_file_data();
+                }
+            }
+        };
+
+        let data = match self.log_viewer.source {
+            log_viewer::Source::Stdin => {self.log_viewer.stdin_data.lock().unwrap()}
+            log_viewer::Source::File => {self.log_viewer.file_data.lock().unwrap()}
+        };
+
+        ui.label(data.items.len());
+        // for item in data.items.iter() {
+        //     ui.label(format!("{:?}", item));
+        // }
     }
 }
 
