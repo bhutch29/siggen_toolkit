@@ -303,7 +303,7 @@ impl LogViewerState {
         std::thread::spawn(move || {
             data.lock().unwrap().clear();
             for (_, line) in reader.lines().enumerate() {
-                data.lock().unwrap().push(line.unwrap()); // TODO: error handling
+                data.lock().unwrap().push(&format!("{}\n", line.unwrap())); // TODO: error handling
             }
         });
     }

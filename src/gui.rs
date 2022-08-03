@@ -936,9 +936,15 @@ impl GuiApp {
         };
 
         ui.label(data.items.len());
-        // for item in data.items.iter() {
-        //     ui.label(format!("{:?}", item));
-        // }
+
+        egui::ScrollArea::vertical()
+            .id_source("log_viewer scroll")
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                // for item in data.items.iter() {
+                //     ui.label(format!("{:?}", item));
+                // }
+            });
     }
 }
 
