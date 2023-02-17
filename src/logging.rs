@@ -158,6 +158,12 @@ impl Default for Level {
     }
 }
 
+#[derive(Debug, Copy, Clone, EnumIter, Display)]
+pub enum Template {
+    GeneralPurpose,
+    MonitorSghalSetups
+}
+
 pub fn get_path() -> Option<PathBuf> {
     for path in valid_paths() {
         if path.exists() {
@@ -245,3 +251,82 @@ const EXCEPTION_LOG_PATH: &str = r"C:\Temp\Keysight.PathWave.SG.ExceptionLog.txt
 
 #[cfg(not(windows))]
 const EXCEPTION_LOG_PATH: &str = "/tmp/Keysight.PathWave.SG.ExceptionLog.txt";
+
+pub fn get_template(template: &Template) -> LoggingConfiguration {
+    // TODO: Consider using lazy_static here
+    let defaultSinks: Vec<Sink> = vec![
+        Sink::Console {
+            level: Level::Trace,
+            name: "console".to_string(),
+            is_color: Some(Bool::Boolean(false)),
+        },
+        Sink::RotatingFile {
+            level: Level::Trace,
+            name: "file".to_string(),
+            file_name: CODE_DEFINED_LOG_PATH.to_string(),
+            truncate: None,
+            max_size: Some(1048576),
+            max_files: Some(5),
+        }
+    ];
+    let template_general_purpose: LoggingConfiguration = LoggingConfiguration {
+        sinks: defaultSinks.clone(),
+        loggers: vec![
+            Logger {
+                name: "*".to_string(),
+                level: Level::Warn,
+                sinks: vec!["console".to_string(), "file".to_string()],
+            },
+            Logger {
+                name: "siggen".to_string(),
+                level: Level::Info,
+                sinks: vec!["console".to_string(), "file".to_string()],
+            },
+            Logger {
+                name: "siggen.*".to_string(),
+                level: Level::Info,
+                sinks: vec!["console".to_string(), "file".to_string()],
+            },
+            Logger {
+                name: "mcs3".to_string(),
+                level: Level::Warn,
+                sinks: vec!["console".to_string(), "file".to_string()],
+            },
+            Logger {
+                name: "ion".to_string(),
+                level: Level::Warn,
+                sinks: vec!["console".to_string(), "file".to_string()],
+            },
+            // TODO
+        ]
+    };
+
+    let template_sghal_setups: LoggingConfiguration = LoggingConfiguration {
+        sinks: defaultSinks.clone(),
+        loggers: vec![
+            Logger {
+                name: "*".to_string(),
+                level: Level::Warn,
+                sinks: vec!["console".to_string(), "file".to_string()],
+            },
+            // TODO
+        ]
+    };
+
+    let template_todo: LoggingConfiguration = LoggingConfiguration {
+        sinks: defaultSinks.clone(),
+        loggers: vec![
+            Logger {
+                name: "*".to_string(),
+                level: Level::Warn,
+                sinks: vec!["console".to_string(), "file".to_string()],
+            },
+            // TODO
+        ]
+    };
+
+    match template {
+        Template::GeneralPurpose => {template_general_purpose}
+        Template::MonitorSghalSetups => {template_sghal_setups}
+    }
+}

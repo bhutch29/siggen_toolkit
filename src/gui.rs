@@ -1,7 +1,7 @@
 use crate::cli::SimulatedChannel;
 use crate::common::in_cwd;
 use crate::gui_state::{EventsState, FilterOptions, HwconfigState, IonDiagnosticsState, LoggingState, LogViewerState, ReportsState, VersionsFilter, VersionsState, VersionsTypes};
-use crate::logging::{Bool, Level, Logger, Sink};
+use crate::logging::{Bool, Level, Logger, Sink, Template};
 use crate::versions::{FileInfo, RequestStatus, BASE_FILE_URL};
 use crate::{common, events, hwconfig, ion_diagnostics, log_viewer, logging, report, versions};
 use clipboard::ClipboardProvider;
@@ -494,6 +494,16 @@ impl GuiApp {
         ui.horizontal(|ui| {
             ui.text_edit_singleline(&mut self.logger.custom_path);
             self.logging_path_buttons(ui, PathBuf::from(&self.logger.custom_path));
+        });
+        ui.separator();
+
+        ui.strong("Templates");
+        ui.horizontal_wrapped(|ui| {
+            for template in Template::iter() {
+                if ui.button(template.to_string()).clicked() {
+                    self.logger.config = logging::get_template(&template);
+                }
+            }
         });
         ui.separator();
 
