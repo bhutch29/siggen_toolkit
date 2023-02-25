@@ -2022,6 +2022,7 @@ dependencies = [
  "gethostname",
  "glob",
  "image",
+ "lazy_static",
  "random_word",
  "reqwest",
  "serde",

@@ -1,6 +1,7 @@
 use crate::common::*;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use lazy_static::lazy_static;
 use strum::{Display, EnumIter};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -160,8 +161,14 @@ impl Default for Level {
 
 #[derive(Debug, Copy, Clone, EnumIter, Display)]
 pub enum Template {
+    #[strum(serialize = "General Purpose")]
     GeneralPurpose,
-    MonitorSghalSetups
+    #[strum(serialize = "Monitor Sghal Setups")]
+    MonitorSghalSetups,
+    Mobius,
+    Websockets,
+    #[strum(serialize = "Multi-Instrument/Grpc")]
+    MultiInstrumentGrpc
 }
 
 pub fn get_path() -> Option<PathBuf> {
@@ -252,9 +259,8 @@ const EXCEPTION_LOG_PATH: &str = r"C:\Temp\Keysight.PathWave.SG.ExceptionLog.txt
 #[cfg(not(windows))]
 const EXCEPTION_LOG_PATH: &str = "/tmp/Keysight.PathWave.SG.ExceptionLog.txt";
 
-pub fn get_template(template: &Template) -> LoggingConfiguration {
-    // TODO: Consider using lazy_static here
-    let default_sinks: Vec<Sink> = vec![
+lazy_static! {
+    static ref DEFAULT_SINKS: Vec<Sink> = vec![
         Sink::Console {
             level: Level::Trace,
             name: "console".to_string(),
@@ -269,8 +275,8 @@ pub fn get_template(template: &Template) -> LoggingConfiguration {
             max_files: Some(5),
         }
     ];
-    let template_general_purpose: LoggingConfiguration = LoggingConfiguration {
-        sinks: default_sinks.clone(),
+    static ref TEMPLATE_GENERAL_PURPOSE: LoggingConfiguration = LoggingConfiguration {
+        sinks: DEFAULT_SINKS.clone(),
         loggers: vec![
             Logger {
                 name: "*".to_string(),
@@ -300,9 +306,8 @@ pub fn get_template(template: &Template) -> LoggingConfiguration {
             // TODO
         ]
     };
-
-    let template_sghal_setups: LoggingConfiguration = LoggingConfiguration {
-        sinks: default_sinks.clone(),
+    static ref TEMPLATE_SGHAL_SETUPS: LoggingConfiguration = LoggingConfiguration {
+        sinks: DEFAULT_SINKS.clone(),
         loggers: vec![
             Logger {
                 name: "*".to_string(),
@@ -313,8 +318,8 @@ pub fn get_template(template: &Template) -> LoggingConfiguration {
         ]
     };
 
-    let template_todo: LoggingConfiguration = LoggingConfiguration {
-        sinks: default_sinks.clone(),
+    static ref TEMPLATE_MOBIUS: LoggingConfiguration = LoggingConfiguration {
+        sinks: DEFAULT_SINKS.clone(),
         loggers: vec![
             Logger {
                 name: "*".to_string(),
@@ -325,8 +330,37 @@ pub fn get_template(template: &Template) -> LoggingConfiguration {
         ]
     };
 
+    static ref TEMPLATE_WEBSOCKETS: LoggingConfiguration = LoggingConfiguration {
+        sinks: DEFAULT_SINKS.clone(),
+        loggers: vec![
+            Logger {
+                name: "*".to_string(),
+                level: Level::Warn,
+                sinks: vec!["console".to_string(), "file".to_string()],
+            },
+            // TODO
+        ]
+    };
+
+    static ref TEMPLATE_MULTI_INSTRUMENT: LoggingConfiguration = LoggingConfiguration {
+        sinks: DEFAULT_SINKS.clone(),
+        loggers: vec![
+            Logger {
+                name: "*".to_string(),
+                level: Level::Warn,
+                sinks: vec!["console".to_string(), "file".to_string()],
+            },
+            // TODO
+        ]
+    };
+}
+
+pub fn get_template(template: &Template) -> LoggingConfiguration {
     match template {
-        Template::GeneralPurpose => {template_general_purpose}
-        Template::MonitorSghalSetups => {template_sghal_setups}
+        Template::GeneralPurpose => {TEMPLATE_GENERAL_PURPOSE.clone()}
+        Template::MonitorSghalSetups => {TEMPLATE_SGHAL_SETUPS.clone()}
+        Template::Mobius => {TEMPLATE_MOBIUS.clone()}
+        Template::Websockets => {TEMPLATE_WEBSOCKETS.clone()}
+        Template::MultiInstrumentGrpc => {TEMPLATE_MULTI_INSTRUMENT.clone()}
     }
 }
