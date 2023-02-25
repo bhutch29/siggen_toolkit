@@ -448,8 +448,10 @@ impl GuiApp {
                     let sink_name = sink.to_string();
                     if ui.button(sink_name.clone()).clicked() {
                         let (name, _level) = sink.get_name_and_level_as_mut();
-                        *name = random_word::gen().to_string();
+                        let random_name = random_word::gen().to_string();
+                        *name = random_name.clone();
                         self.logger.config.sinks.push(sink);
+                        self.handle_sinks_action(SinksAction::Enable(random_name))
                     }
                 }
             });
@@ -457,24 +459,7 @@ impl GuiApp {
             egui::ScrollArea::vertical()
                 .id_source("scroll_sinks")
                 .show(&mut columns[0], |ui| {
-                    let action = self.sinks(ui);
-
-                    match action {
-                        None => {}
-                        Some(SinksAction::Remove(index)) => {
-                            self.logger.config.sinks.remove(index);
-                        }
-                        Some(SinksAction::Enable(sink)) => {
-                            for logger in self.logger.config.loggers.iter_mut() {
-                                logger.sinks.push(sink.clone());
-                            }
-                        }
-                        Some(SinksAction::Disable(sink)) => {
-                            for logger in self.logger.config.loggers.iter_mut() {
-                                logger.sinks.retain(|s| s != &sink);
-                            }
-                        }
-                    }
+                    if let Some(action) = self.sinks(ui) { self.handle_sinks_action(action) };
                 });
 
             columns[1].heading("Loggers");
@@ -495,6 +480,25 @@ impl GuiApp {
                 });
         });
     }
+
+    fn handle_sinks_action(&mut self, action: SinksAction) {
+        match action {
+            SinksAction::Remove(index) => {
+                self.logger.config.sinks.remove(index);
+            }
+            SinksAction::Enable(sink) => {
+                for logger in self.logger.config.loggers.iter_mut() {
+                    logger.sinks.push(sink.clone());
+                }
+            }
+            SinksAction::Disable(sink) => {
+                for logger in self.logger.config.loggers.iter_mut() {
+                    logger.sinks.retain(|s| s != &sink);
+                }
+            }
+        }
+    }
+
 
     fn logging_path(&mut self, ui: &mut Ui, path: &Path) {
         ui.horizontal(|ui| {
