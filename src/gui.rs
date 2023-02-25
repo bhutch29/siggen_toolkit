@@ -466,7 +466,9 @@ impl GuiApp {
             columns[1].horizontal(|ui| {
                 ui.label("Create new Logger:");
                 if ui.button(" + ").clicked() {
-                    self.logger.config.loggers.push(Logger::default());
+                    let mut new_logger = Logger::default();
+                    new_logger.sinks = self.logger.config.sinks.iter().map(|x| x.get_name().clone()).collect();
+                    self.logger.config.loggers.push(new_logger);
                 }
             });
 
