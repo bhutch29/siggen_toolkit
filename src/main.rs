@@ -3,7 +3,6 @@
 
 mod cli;
 mod common;
-mod events;
 mod gui;
 mod gui_state;
 mod hwconfig;

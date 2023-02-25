@@ -1,4 +1,3 @@
-use crate::events;
 use crate::hwconfig;
 use crate::logging;
 use crate::report;
@@ -24,8 +23,6 @@ pub enum Command {
     Log(LogCommand),
     #[structopt(about = "Create or browse reports.")]
     Report(ReportCommand),
-    #[structopt(about = "Windows Event Log viewing.")]
-    Events(EventsCommand),
 }
 
 #[derive(StructOpt, Debug)]
@@ -45,11 +42,6 @@ pub enum ReportCommand {
     Upload {
         name: String,
     },
-}
-
-#[derive(StructOpt, Debug)]
-pub enum EventsCommand {
-    List,
 }
 
 #[derive(StructOpt, Debug)]
@@ -116,11 +108,6 @@ pub fn run(command: Command) -> anyhow::Result<()> {
                     versions::report_segments(),
                     file_name
                 );
-            }
-        },
-        Command::Events(cmd) => match cmd {
-            EventsCommand::List { .. } => {
-                events::print_event_stuff();
             }
         },
     };

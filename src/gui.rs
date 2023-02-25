@@ -1,8 +1,8 @@
 use crate::common::in_cwd;
-use crate::gui_state::{EventsState, FilterOptions, HwconfigState, IonDiagnosticsState, LoggingState, LogViewerState, ReportsState, VersionsFilter, VersionsState, VersionsTypes};
+use crate::gui_state::{FilterOptions, HwconfigState, IonDiagnosticsState, LoggingState, LogViewerState, ReportsState, VersionsFilter, VersionsState, VersionsTypes};
 use crate::logging::{Bool, Level, Logger, Sink, Template};
 use crate::versions::{FileInfo, RequestStatus, BASE_FILE_URL};
-use crate::{common, events, hwconfig, ion_diagnostics, log_viewer, logging, report, versions};
+use crate::{common, hwconfig, ion_diagnostics, log_viewer, logging, report, versions};
 use clipboard::ClipboardProvider;
 use eframe::{egui, egui::Ui, epi};
 use std::collections::BTreeMap;
@@ -28,7 +28,6 @@ enum Tabs {
     LogViewer,
     Packages,
     Installers,
-    Events,
     Reports,
 }
 
@@ -39,7 +38,6 @@ struct GuiApp {
     log_viewer: LogViewerState,
     packages: VersionsState,
     installers: VersionsState,
-    events: EventsState,
     reports: ReportsState,
     diagnostics: IonDiagnosticsState,
 }
@@ -52,7 +50,6 @@ impl Default for GuiApp {
             log_viewer: Default::default(),
             packages: VersionsState::new(VersionsTypes::Packages),
             installers: VersionsState::new(VersionsTypes::Installers),
-            events: Default::default(),
             reports: Default::default(),
             diagnostics: Default::default(),
             selected_tab: Some(Tabs::LoggingConfiguration),
@@ -104,9 +101,6 @@ impl epi::App for GuiApp {
                 Some(Tabs::Installers) => {
                     versions(ui, frame, &mut self.installers);
                 }
-                Some(Tabs::Events) => {
-                    self.events(ui);
-                }
                 Some(Tabs::Reports) => {
                     self.report(ui, frame);
                 }
@@ -136,8 +130,6 @@ impl epi::App for GuiApp {
         self.diagnostics.loaded_from = Some(path);
 
         self.update_report_summary();
-
-        self.events.cache = events::get_events();
 
         let stdin_data = self.log_viewer.stdin_data.clone();
         let repaint = frame.repaint_signal().clone();
@@ -370,35 +362,6 @@ impl GuiApp {
         *self.reports.upload_status.lock().unwrap() = RequestStatus::Idle;
 
         self.reports.host_name = Some(gethostname::gethostname().to_string_lossy().to_string());
-    }
-
-    fn events(&mut self, ui: &mut Ui) {
-        ui.heading("Events (WIP)");
-        ui.separator();
-        if !cfg!(windows) {
-            ui.label("Event Log is only supported on Windows.");
-        } else {
-            egui::ScrollArea::vertical()
-                .id_source("scroll_sinks")
-                .show(ui, |ui| {
-                    match &self.events.cache {
-                        Ok(events) => {
-                            for event in events {
-                                ui.horizontal(|ui| {
-                                    ui.label(event.system.level);
-                                    ui.label(&event.system.provider.name);
-                                    ui.label(&event.system.time_created.system_time);
-                                });
-                            }
-                        }
-                        Err(msg) => { ui.label(msg); }
-                    };
-
-                });
-
-
-            // TODO
-        }
     }
 
     fn hwconfig(&mut self, ui: &mut Ui) {
