@@ -254,7 +254,7 @@ const EXCEPTION_LOG_PATH: &str = "/tmp/Keysight.PathWave.SG.ExceptionLog.txt";
 
 pub fn get_template(template: &Template) -> LoggingConfiguration {
     // TODO: Consider using lazy_static here
-    let defaultSinks: Vec<Sink> = vec![
+    let default_sinks: Vec<Sink> = vec![
         Sink::Console {
             level: Level::Trace,
             name: "console".to_string(),
@@ -270,7 +270,7 @@ pub fn get_template(template: &Template) -> LoggingConfiguration {
         }
     ];
     let template_general_purpose: LoggingConfiguration = LoggingConfiguration {
-        sinks: defaultSinks.clone(),
+        sinks: default_sinks.clone(),
         loggers: vec![
             Logger {
                 name: "*".to_string(),
@@ -302,7 +302,7 @@ pub fn get_template(template: &Template) -> LoggingConfiguration {
     };
 
     let template_sghal_setups: LoggingConfiguration = LoggingConfiguration {
-        sinks: defaultSinks.clone(),
+        sinks: default_sinks.clone(),
         loggers: vec![
             Logger {
                 name: "*".to_string(),
@@ -314,7 +314,7 @@ pub fn get_template(template: &Template) -> LoggingConfiguration {
     };
 
     let template_todo: LoggingConfiguration = LoggingConfiguration {
-        sinks: defaultSinks.clone(),
+        sinks: default_sinks.clone(),
         loggers: vec![
             Logger {
                 name: "*".to_string(),

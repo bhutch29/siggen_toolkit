@@ -1,4 +1,3 @@
-use crate::cli::SimulatedChannel;
 use crate::common::in_cwd;
 use crate::gui_state::{EventsState, FilterOptions, HwconfigState, IonDiagnosticsState, LoggingState, LogViewerState, ReportsState, VersionsFilter, VersionsState, VersionsTypes};
 use crate::logging::{Bool, Level, Logger, Sink, Template};
@@ -412,21 +411,7 @@ impl GuiApp {
         ui.strong("Current working directory:");
         self.hwconfig_path(ui, &in_cwd(hwconfig::FILE_NAME));
         ui.separator();
-
-        ui.heading("Simulated Hardware Configuration");
-        self.platform_dropdown(ui);
-        self.channel_count_selector(ui);
-        if let SimulatedChannel::MCS31 { .. } = self.hwconfig.platform {
-            ui.checkbox(&mut self.hwconfig.has_io_extender, "Include IO Extender on first channel");
-        }
-        ui.add_enabled(
-            false,
-            egui::TextEdit::multiline(&mut hwconfig::serialize_hwconfig(
-                self.hwconfig.platform,
-                self.hwconfig.channel_count,
-                self.hwconfig.has_io_extender
-            )),
-        );
+        ui.add(egui::TextEdit::multiline(&mut self.hwconfig.text).hint_text("Enter desired hardware configuration and click Save above."));
     }
 
     fn hwconfig_path(&mut self, ui: &mut Ui, path: &Path) {
@@ -439,7 +424,8 @@ impl GuiApp {
     fn hwconfig_path_buttons(&mut self, ui: &mut Ui, path: &Path) {
         if ui.button("Save").clicked() {
             self.hwconfig.write_error =
-                hwconfig::set(path, self.hwconfig.platform, self.hwconfig.channel_count, self.hwconfig.has_io_extender).is_err();
+                // hwconfig::set(path, self.hwconfig.platform, self.hwconfig.channel_count, self.hwconfig.has_io_extender).is_err();
+                hwconfig::set_text(path, &self.hwconfig.text).is_err();
             self.hwconfig.remove_error = false;
         }
         if ui
@@ -458,31 +444,11 @@ impl GuiApp {
         }
     }
 
-    fn channel_count_selector(&mut self, ui: &mut Ui) {
-        ui.horizontal(|ui| {
-            ui.selectable_value(&mut self.hwconfig.channel_count, 1, "1");
-            ui.selectable_value(&mut self.hwconfig.channel_count, 2, "2");
-            ui.selectable_value(&mut self.hwconfig.channel_count, 4, "4");
-            ui.selectable_value(&mut self.hwconfig.channel_count, 8, "8");
-            ui.label("Number of Channels");
-        });
-    }
-
-    fn platform_dropdown(&mut self, ui: &mut Ui) {
-        egui::ComboBox::from_label("Platform")
-            .selected_text(format!("{}", self.hwconfig.platform))
-            .show_ui(ui, |ui| {
-                ui.selectable_value(
-                    &mut self.hwconfig.platform,
-                    SimulatedChannel::MCS31 { has_io_extender: false },
-                    "MCS3.1",
-                );
-                ui.selectable_value(&mut self.hwconfig.platform, SimulatedChannel::MCS15, "MCS1.5");
-            });
-    }
-
     fn logging(&mut self, ui: &mut Ui) {
-        ui.heading("KSF Logger Configuration");
+        ui.horizontal(|ui| {
+            ui.heading("KSF Logger Configuration");
+            ui.checkbox(&mut self.logger.advanced, "Advanced Options");
+        });
         ui.separator();
         ui.strong("Paths indexed by SigGen:");
         for path in logging::valid_paths().iter() {
@@ -502,6 +468,7 @@ impl GuiApp {
             for template in Template::iter() {
                 if ui.button(template.to_string()).clicked() {
                     self.logger.config = logging::get_template(&template);
+                    self.logger.loaded_from = None;
                 }
             }
         });
@@ -511,8 +478,11 @@ impl GuiApp {
             columns[0].heading("Sinks");
             columns[0].horizontal_wrapped(|ui| {
                 ui.label("Create new Sink:");
-                for sink in Sink::iter() {
-                    if ui.button(sink.to_string()).clicked() {
+                for mut sink in Sink::iter() {
+                    let sink_name = sink.to_string();
+                    if ui.button(sink_name.clone()).clicked() {
+                        let (name, _level) = sink.get_name_and_level_as_mut();
+                        *name = random_word::gen().to_string();
                         self.logger.config.sinks.push(sink);
                     }
                 }
@@ -610,10 +580,12 @@ impl GuiApp {
                 if ui.button(" x ").on_hover_text("Remove").clicked() {
                     loggers_to_remove.push(i);
                 }
-                ui.add(egui::TextEdit::singleline(&mut logger.name).hint_text("Pattern to match"));
+                ui.add(egui::TextEdit::singleline(&mut logger.name).hint_text("Pattern to match").desired_width(150.0));
+                level_dropdown(ui, &mut logger.level, format!("{} {}", &logger.name, i));
             });
-            level_dropdown(ui, &mut logger.level, format!("{} {}", &logger.name, i));
-            sinks_checkboxes(ui, logger, &self.logger.config.sinks);
+            if self.logger.advanced {
+                sinks_checkboxes(ui, logger, &self.logger.config.sinks);
+            }
         }
         loggers_to_remove
     }
@@ -628,16 +600,21 @@ impl GuiApp {
                     action = Some(SinksAction::Remove(i));
                 }
                 ui.strong(sink.to_string());
-                if ui.button(" ➕ ").on_hover_text("Enable on all loggers").clicked() {
-                    action = Some(SinksAction::Enable(sink.get_name().clone()));
-                }
-                if ui.button(" ➖ ").on_hover_text("Disable on all loggers").clicked() {
-                    action = Some(SinksAction::Disable(sink.get_name().clone()));
+
+                if self.logger.advanced {
+                    if ui.button(" ➕ ").on_hover_text("Enable on all loggers").clicked() {
+                        action = Some(SinksAction::Enable(sink.get_name().clone()));
+                    }
+                    if ui.button(" ➖ ").on_hover_text("Disable on all loggers").clicked() {
+                        action = Some(SinksAction::Disable(sink.get_name().clone()));
+                    }
                 }
             });
 
             let (name, level) = sink.get_name_and_level_as_mut();
-            text_edit_labeled(ui, "Name", name, Some("Unique name required"));
+            if self.logger.advanced {
+                text_edit_labeled(ui, "Name", name, Some("Unique name required"));
+            }
             level_dropdown(ui, level, format!("{} {}", name, i));
 
             match sink {

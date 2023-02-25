@@ -1,4 +1,3 @@
-use crate::cli::SimulatedChannel;
 use crate::logging::LoggingConfiguration;
 use crate::versions::{develop_branch, parse_semver, FileInfo, RequestStatus, SemVer, VersionsClient};
 use std::cmp::Ordering;
@@ -12,21 +11,17 @@ use crate::ion_diagnostics::DiagnosticsConfiguration;
 use crate::log_viewer;
 
 pub struct HwconfigState {
-    pub channel_count: u8,
-    pub platform: SimulatedChannel,
-    pub has_io_extender: bool,
     pub write_error: bool,
     pub remove_error: bool,
+    pub text: String
 }
 
 impl Default for HwconfigState {
     fn default() -> Self {
         Self {
-            channel_count: 1,
-            platform: SimulatedChannel::MCS31 {has_io_extender: false},
-            has_io_extender: false,
             write_error: false,
             remove_error: false,
+            text: Default::default()
         }
     }
 }
@@ -38,6 +33,7 @@ pub struct LoggingState {
     pub loaded_from: Option<PathBuf>,
     pub write_error: bool,
     pub remove_error: bool,
+    pub advanced: bool,
 }
 
 #[derive(Default)]

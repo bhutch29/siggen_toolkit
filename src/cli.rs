@@ -5,7 +5,6 @@ use crate::report;
 use crate::versions;
 use std::path::Path;
 pub use structopt::StructOpt;
-use strum::Display;
 
 #[derive(StructOpt, Debug)]
 #[structopt(
@@ -55,43 +54,14 @@ pub enum EventsCommand {
 
 #[derive(StructOpt, Debug)]
 pub enum HwConfigCommand {
-    Set {
-        #[structopt(default_value = "2", short, long)]
-        channel_count: u8,
-        #[structopt(short, long)]
-        has_io_extender: bool,
-        #[structopt(subcommand)]
-        config: SimulatedChannel,
-    },
     Restore,
     Show,
     Paths,
 }
 
-#[derive(StructOpt, Debug, Clone, Copy, PartialEq, Display)]
-pub enum SimulatedChannel {
-    #[strum(serialize = "MCS1.5")]
-    MCS15,
-    #[strum(serialize = "MCS3.1")]
-    #[structopt(name = "MCS3")]
-    MCS31 {
-        #[structopt(short, long)]
-        has_io_extender: bool,
-    },
-}
-
-impl Default for SimulatedChannel {
-    fn default() -> Self {
-        Self::MCS31 {has_io_extender: false}
-    }
-}
-
 pub fn run(command: Command) -> anyhow::Result<()> {
     match command {
         Command::HwConfig(cmd) => match cmd {
-            HwConfigCommand::Set { config, channel_count, has_io_extender } => {
-                hwconfig::set(&hwconfig::get_path_or_cwd(), config, channel_count, has_io_extender)?
-            }
             HwConfigCommand::Restore => println!("Not yet implemented!"),
             HwConfigCommand::Show => match hwconfig::read_from(&hwconfig::get_path_or_cwd()) {
                 Some(text) => {
