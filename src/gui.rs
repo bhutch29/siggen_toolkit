@@ -68,7 +68,10 @@ impl epi::App for GuiApp {
                 });
                 ui.separator();
                 for tab in Tabs::iter() {
-                    self.make_tab(ui, Some(tab));
+                    // Hide LogViewer in Release builds for now
+                    if cfg!(debug_assertions) || tab != Tabs::LogViewer {
+                        self.make_tab(ui, Some(tab));
+                    }
                 }
 
                 ui.with_layout(egui::Layout::right_to_left(), |ui| {
