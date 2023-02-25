@@ -429,8 +429,8 @@ impl GuiApp {
         });
         ui.separator();
 
-        ui.strong("Templates");
         ui.horizontal_wrapped(|ui| {
+            ui.strong("Templates:");
             for template in Template::iter() {
                 if ui.button(template.to_string()).clicked() {
                     self.logger.config = logging::get_template(&template);
