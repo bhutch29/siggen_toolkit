@@ -1,8 +1,6 @@
 // TODO: This works to hide the console when launching the GUI but then hides the console output when using the CLI
 // #![windows_subsystem = "windows"] // Hides console on Windows
 
-#[macro_use] extern crate rocket;
-
 use structopt::StructOpt;
 use crate::cli::{Command, Sgt};
 
@@ -27,6 +25,7 @@ fn main() -> anyhow::Result<()> {
         println!();
     }
 
+    // TODO: hide irrelevant tabs, if any, when running remotely. hwconfig? versions?
     match args.command {
         None => gui::run(), // TODO: inject native API
         Some(Command::Backend) => {

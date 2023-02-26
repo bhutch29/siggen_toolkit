@@ -167,12 +167,13 @@ impl GuiApp {
             Some("Descriptive name for report .zip file. Required."),
         );
 
+        // TODO: move all calls that trigger HTTP requests out of render loop
         let file_name = report::zip_file_name(&self.reports.name);
         let file_path = in_cwd(&file_name);
 
         if self.reports.name_changed() {
             self.reports.generate_status = None;
-            self.reports.file_exists = file_path.exists();
+            self.reports.file_exists = file_path.exists(); // TODO: move file checks to backend
             *self.reports.upload_status.lock().unwrap() = RequestStatus::Idle;
         }
 
@@ -1092,7 +1093,7 @@ fn warning_label(ui: &mut Ui, label: &str) {
 fn copyable_path(ui: &mut Ui, path: &Path) {
     let label = ui
         .selectable_label(false, &path.to_string_lossy())
-        .on_hover_text("Left click to open in Explorer. Right click to copy.");
+        .on_hover_text("Left click to open in Explorer. Right click to copy."); // TODO: modify when in browser
 
     if label.clicked() && common::open_explorer(path).is_err() {
         // Do Nothing

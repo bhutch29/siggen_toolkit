@@ -1,0 +1,23 @@
+#
+GET http://localhost:8000
+
+#
+GET http://localhost:8000/logging/valid-paths
+ACCEPT application/json
+
+#
+GET http://localhost:8000/logging/config/tmp/file.txt
+ACCEPT application/json
+
+#
+GET http://localhost:8000/logging/config/home/bhutch/Keysight/PathWave/SignalGenerator/ksflogger.cfg
+ACCEPT application/json
+
+#
+POST http://localhost:8000/logging/config/tmp/ksflogger.cfg
+Content-Type: application/json
+
+{
+"sinks": [],
+"loggers": []
+}

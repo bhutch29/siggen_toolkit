@@ -3,6 +3,7 @@ use std::fmt::Write as fmtWrite;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 
+// TODO: backend
 pub fn create_report(name: &str) -> anyhow::Result<()> {
     let file_name = zip_file_name(name);
     let file = std::fs::File::create(&file_name).unwrap();
@@ -67,6 +68,7 @@ pub fn create_report(name: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+// TODO: backend
 pub fn zip_file_name(name: &str) -> String {
     format!(
         "{}_{}.zip",
@@ -75,6 +77,7 @@ pub fn zip_file_name(name: &str) -> String {
     )
 }
 
+// TODO: backend
 fn add_file(zip: &mut zip::ZipWriter<std::fs::File>, path: PathBuf) -> anyhow::Result<()> {
     let name = path.file_name().unwrap().to_string_lossy();
     zip.start_file(format!("{}/{}", "config", name), Default::default())?;
@@ -93,6 +96,7 @@ pub fn get_no_reset_system_settings_path() -> PathBuf {
         .join("SigGenInstrumentSpecificSettings.sgen")
 }
 
+// TODO: backend
 pub fn get_data_dir_state_file_paths() -> Vec<String> {
     dirs::data_dir()
         .and_then(|dir| {
