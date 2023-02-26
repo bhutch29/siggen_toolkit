@@ -1,6 +1,11 @@
 // TODO: This works to hide the console when launching the GUI but then hides the console output when using the CLI
 // #![windows_subsystem = "windows"] // Hides console on Windows
 
+#[macro_use] extern crate rocket;
+
+use structopt::StructOpt;
+use crate::cli::{Command, Sgt};
+
 mod cli;
 mod common;
 mod gui;
@@ -11,8 +16,7 @@ mod report;
 mod versions;
 mod ion_diagnostics;
 mod log_viewer;
-
-use cli::*;
+mod server;
 
 fn main() -> anyhow::Result<()> {
     let args: Sgt = Sgt::from_args();
@@ -24,7 +28,12 @@ fn main() -> anyhow::Result<()> {
     }
 
     match args.command {
-        None => gui::run(),
+        None => gui::run(), // TODO: inject native API
+        Some(Command::Backend) => {
+            server::main();
+            Ok(())
+        },
+        Some(Command::Frontend) => gui::run(), // TODO: inject HTTP client API
         Some(command) => cli::run(command),
     }
 }

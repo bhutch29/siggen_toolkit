@@ -3,7 +3,7 @@ use crate::logging;
 use crate::report;
 use crate::versions;
 use std::path::Path;
-pub use structopt::StructOpt;
+use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
 #[structopt(
@@ -17,6 +17,10 @@ pub struct Sgt {
 
 #[derive(StructOpt, Debug)]
 pub enum Command {
+    #[structopt(about = "Run only the backend HTTP server.")]
+    Backend,
+    #[structopt(about = "Run only the GUI to connect to a running backend.")]
+    Frontend,
     #[structopt(name = "hwconfig", about = "Simulated hardware configuration.")]
     HwConfig(HwConfigCommand),
     #[structopt(about = "Logging configuration.")]
@@ -110,6 +114,7 @@ pub fn run(command: Command) -> anyhow::Result<()> {
                 );
             }
         },
+        _ => {return Err(anyhow::anyhow!("unrecognized command"))}
     };
     Ok(())
 }

@@ -420,12 +420,14 @@ impl GuiApp {
         for path in logging::valid_paths().iter() {
             self.logging_path(ui, path);
         }
-        ui.strong("Current working directory:");
-        self.logging_path(ui, &in_cwd(logging::FILE_NAME));
-        ui.strong("Custom:");
-        ui.horizontal(|ui| {
-            ui.text_edit_singleline(&mut self.logger.custom_path);
-            self.logging_path_buttons(ui, PathBuf::from(&self.logger.custom_path));
+        ui.collapsing("Other Paths", |ui| {
+            ui.strong("Current working directory:");
+            self.logging_path(ui, &in_cwd(logging::FILE_NAME));
+            ui.strong("Custom:");
+            ui.horizontal(|ui| {
+                ui.text_edit_singleline(&mut self.logger.custom_path);
+                self.logging_path_buttons(ui, PathBuf::from(&self.logger.custom_path));
+            });
         });
         ui.separator();
 
