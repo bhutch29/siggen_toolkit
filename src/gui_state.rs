@@ -9,20 +9,19 @@ use std::sync::{Arc, Mutex};
 use crate::ion_diagnostics::DiagnosticsConfiguration;
 use crate::log_viewer;
 
+#[derive(Default, Clone)]
+pub struct PathInfo {
+    pub path: PathBuf,
+    pub file_exists: bool
+}
+
+#[derive(Default)]
 pub struct HwconfigState {
     pub write_error: bool,
     pub remove_error: bool,
-    pub text: String
-}
-
-impl Default for HwconfigState {
-    fn default() -> Self {
-        Self {
-            write_error: false,
-            remove_error: false,
-            text: Default::default()
-        }
-    }
+    pub text: String,
+    pub cwd_path_info: PathInfo,
+    pub valid_paths_info: Vec<PathInfo>
 }
 
 #[derive(Default)]
@@ -33,6 +32,7 @@ pub struct LoggingState {
     pub write_error: bool,
     pub remove_error: bool,
     pub advanced: bool,
+    pub valid_paths: Vec<PathBuf>
 }
 
 #[derive(Default)]
@@ -72,6 +72,7 @@ pub struct ReportsState {
     pub file_exists: bool,
     pub upload_status: Arc<Mutex<RequestStatus>>,
     pub host_name: Option<String>,
+    pub zip_file_path: PathBuf
 }
 
 impl ReportsState {
