@@ -1,12 +1,6 @@
 use std::path::{Path, PathBuf};
 use crate::{ion_diagnostics, logging, report};
-use rocket::{
-    serde::json::Json,
-    get,
-    post,
-    launch,
-    http::Status
-};
+use rocket::{serde::json::Json, get, post, launch, http::Status, delete};
 use crate::ion_diagnostics::DiagnosticsConfiguration;
 use crate::logging::LoggingConfiguration;
 
@@ -54,9 +48,25 @@ fn get_data_dir_state_file_paths() -> Json<Vec<String>> {
     Json(report::get_data_dir_state_file_paths())
 }
 
+#[get("/reports/exception-log-path", format = "json")]
+fn get_exception_log_path() -> Json<PathBuf> {
+    Json(logging::get_exception_log_path())
+}
+
 #[get("/reports/zip-file-name/<name>")]
 fn get_report_zip_file_name(name: &str) -> String {
     report::zip_file_name(name)
+}
+
+#[get("/file-exists/<path..>", format = "json")]
+fn get_file_exists(path: PathBuf) -> &'static str {
+    if path.exists() { "true" } else { "false" }
+}
+
+// TODO: protections
+#[delete("/delete-file/<path..>")]
+fn delete_file(path: PathBuf) -> std::io::Result<()> {
+    std::fs::remove_file(path)
 }
 
 #[launch]
@@ -69,6 +79,9 @@ pub fn rocket() -> _ {
         set_ion_diagnostics_config,
         create_report,
         get_data_dir_state_file_paths,
+        get_exception_log_path,
         get_report_zip_file_name,
+        get_file_exists,
+        delete_file
     ])
 }

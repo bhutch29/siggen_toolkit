@@ -169,6 +169,7 @@ impl GuiApp {
 
         // TODO: move all calls that trigger HTTP requests out of render loop
         let file_name = report::zip_file_name(&self.reports.name);
+        // TODO: cwd has no meaning when remote, remove from GUI
         let file_path = in_cwd(&file_name);
 
         if self.reports.name_changed() {
@@ -390,9 +391,7 @@ impl GuiApp {
 
     fn hwconfig_path_buttons(&mut self, ui: &mut Ui, path: &Path) {
         if ui.button("Save").clicked() {
-            self.hwconfig.write_error =
-                // hwconfig::set(path, self.hwconfig.platform, self.hwconfig.channel_count, self.hwconfig.has_io_extender).is_err();
-                hwconfig::set_text(path, &self.hwconfig.text).is_err();
+            self.hwconfig.write_error = hwconfig::set_text(path, &self.hwconfig.text).is_err();
             self.hwconfig.remove_error = false;
         }
         if ui

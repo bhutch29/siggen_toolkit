@@ -250,6 +250,7 @@ pub fn remove_invalid_sinks(logger: &mut Logger, sinks: &[Sink]) {
 
 pub const FILE_NAME: &str = "ksflogger.cfg";
 
+// TODO: backend
 #[cfg(windows)]
 const CODE_DEFINED_LOG_PATH: &str = r"C:\Temp\Keysight.PathWave.SG.log";
 
