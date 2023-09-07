@@ -4,6 +4,7 @@ use crate::logging::{Bool, Level, Logger, Sink, Template};
 use crate::versions::{FileInfo, RequestStatus, BASE_FILE_URL};
 use crate::{common, hwconfig, ion_diagnostics, log_viewer, logging, report, versions};
 use clipboard::ClipboardProvider;
+use eframe::egui::Visuals;
 use eframe::{egui, egui::Ui, epi};
 use std::collections::BTreeMap;
 use std::io;
@@ -62,10 +63,10 @@ impl Default for GuiApp {
 }
 
 impl epi::App for GuiApp {
-    fn update(&mut self, ctx: &egui::CtxRef, frame: &mut epi::Frame<'_>) {
+    fn update(&mut self, ctx: &egui::Context, frame: &epi::Frame) {
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
-                egui::menu::menu(ui, "File", |ui| {
+                egui::menu::menu_button(ui, "File", |ui| {
                     if ui.button("Quit").clicked() {
                         frame.quit();
                     }
@@ -124,7 +125,8 @@ impl epi::App for GuiApp {
         });
     }
 
-    fn setup(&mut self, _ctx: &egui::CtxRef, frame: &mut epi::Frame<'_>, _storage: Option<&dyn epi::Storage>) {
+    fn setup(&mut self, ctx: &egui::Context, frame: &epi::Frame, _storage: Option<&dyn epi::Storage>) {
+        ctx.set_visuals(Visuals::dark());
         self.cwd = in_cwd(PathBuf::new());
         self.logger.config = logging::get_config_from(&logging::get_path_or_cwd()).unwrap_or_default();
         self.logger.loaded_from = Some(logging::get_path_or_cwd());
@@ -150,9 +152,8 @@ impl epi::App for GuiApp {
         self.update_report_summary();
 
         let stdin_data = self.log_viewer.stdin_data.clone();
-        let repaint = frame.repaint_signal().clone();
 
-        log_viewer::watch_stdin(stdin_data, repaint);
+        log_viewer::watch_stdin(stdin_data, frame.clone());
     }
 
     fn name(&self) -> &str {
@@ -171,7 +172,7 @@ impl GuiApp {
         }
     }
 
-    fn report(&mut self, ui: &mut Ui, frame: &mut epi::Frame<'_>) {
+    fn report(&mut self, ui: &mut Ui, frame: &epi::Frame) {
         ui.heading("Reports");
         ui.separator();
 
@@ -237,7 +238,7 @@ impl GuiApp {
         });
     }
 
-    fn report_upload_button(&mut self, ui: &mut Ui, frame: &mut epi::Frame<'_>, path: &Path) {
+    fn report_upload_button(&mut self, ui: &mut Ui, frame: &epi::Frame, path: &Path) {
         ui.add_enabled_ui(self.reports.file_exists, |ui| {
             ui.horizontal(|ui| match *self.reports.upload_status.lock().unwrap() {
                 RequestStatus::InProgress => {
@@ -277,14 +278,14 @@ impl GuiApp {
         });
     }
 
-    fn upload_clicked(&self, frame: &mut epi::Frame<'_>, path: &Path) {
+    fn upload_clicked(&self, frame: &epi::Frame, path: &Path) {
         if self
             .packages
             .client
             .upload_report(
                 path,
                 Some(self.reports.upload_status.clone()),
-                Some(frame.repaint_signal().clone()),
+                Some(frame.clone()),
             )
             .is_err()
         {
@@ -720,7 +721,7 @@ impl GuiApp {
                             if ui.button(" x ").on_hover_text("Remove").clicked() {
                                 instances_to_remove.push(i);
                             }
-                            ui.heading(i + 1);
+                            ui.heading((i + 1).to_string());
                         });
 
                         ui.horizontal(|ui| {
@@ -796,7 +797,7 @@ impl GuiApp {
                             if ui.button(" x ").on_hover_text("Remove").clicked() {
                                 instances_to_remove.push(i);
                             }
-                            ui.heading(i + 1);
+                            ui.heading((i + 1).to_string());
                         });
 
                         ui.horizontal(|ui| {
@@ -904,7 +905,7 @@ impl GuiApp {
             log_viewer::Source::File => {self.log_viewer.file_data.lock().unwrap()}
         };
 
-        ui.label(data.items.len());
+        ui.label(data.items.len().to_string());
 
         // egui::ScrollArea::vertical()
         //     .id_source("log_viewer scroll")
@@ -938,7 +939,7 @@ fn about(ui: &mut Ui) {
     ui.label(format!("Authors: {}", AUTHORS));
 }
 
-fn versions(ui: &mut Ui, frame: &mut epi::Frame<'_>, state: &mut VersionsState) {
+fn versions(ui: &mut Ui, frame: &epi::Frame, state: &mut VersionsState) {
     state.setup_if_needed();
 
     ui.horizontal(|ui| {
@@ -1036,7 +1037,7 @@ fn version_filters(ui: &mut Ui, filter: &mut VersionsFilter) {
     }
 }
 
-fn versions_row(ui: &mut Ui, frame: &mut epi::Frame<'_>, state: &mut VersionsState, file_info: &FileInfo) {
+fn versions_row(ui: &mut Ui, frame: &epi::Frame, state: &mut VersionsState, file_info: &FileInfo) {
     ui.horizontal(|ui| {
         ui.monospace(format!(
             "{:12} {:15}",
@@ -1067,7 +1068,7 @@ fn versions_row(ui: &mut Ui, frame: &mut epi::Frame<'_>, state: &mut VersionsSta
     .on_hover_text(&file_info.full_name);
 }
 
-fn download_clicked(frame: &mut epi::Frame<'_>, state: &mut VersionsState, file_info: &FileInfo) {
+fn download_clicked(frame: &epi::Frame, state: &mut VersionsState, file_info: &FileInfo) {
     let status = match state.which {
         VersionsTypes::Packages => &mut state.package_status,
         VersionsTypes::Installers => &mut state.installer_status,
@@ -1082,7 +1083,7 @@ fn download_clicked(frame: &mut epi::Frame<'_>, state: &mut VersionsState, file_
             &state.selected_branch,
             &file_info.full_name,
             status.clone(),
-            frame.repaint_signal().clone(),
+            frame.clone(),
         )
         .is_err()
     {
@@ -1111,7 +1112,7 @@ fn warning_label(ui: &mut Ui, label: &str) {
 
 fn copyable_path(ui: &mut Ui, path: &Path) {
     let label = ui
-        .selectable_label(false, &path.to_string_lossy())
+        .selectable_label(false, path.to_str().unwrap())
         .on_hover_text("Left click to open in Explorer. Right click to copy."); // TODO: modify when in browser
 
     if label.clicked() && common::open_explorer(path).is_err() {

@@ -2,7 +2,7 @@ use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use anyhow::anyhow;
 use chrono::NaiveDateTime;
-use eframe::epi::RepaintSignal;
+use eframe::epi;
 use strum::{Display, EnumString};
 
 #[derive(PartialEq, Display)]
@@ -98,7 +98,7 @@ impl Data {
     }
 }
 
-pub fn watch_stdin(data: Arc<Mutex<Data>>, repaint: Arc<dyn RepaintSignal>) {
+pub fn watch_stdin(data: Arc<Mutex<Data>>, frame: epi::Frame) {
     std::thread::spawn(move || {
         let stdin = std::io::stdin();
         loop {
@@ -106,7 +106,7 @@ pub fn watch_stdin(data: Arc<Mutex<Data>>, repaint: Arc<dyn RepaintSignal>) {
             if let Ok(..) = stdin.read_line(&mut buffer)
             {
                 if !buffer.is_empty() {
-                    repaint.request_repaint();
+                    frame.request_repaint();
                     data.lock().unwrap().push(&buffer);
                 }
             }

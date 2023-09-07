@@ -1,5 +1,5 @@
 use crate::gui_state::VersionsTypes;
-use eframe::epi::RepaintSignal;
+use eframe::epi;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::VecDeque;
@@ -193,7 +193,7 @@ impl VersionsClient {
         branch: &str,
         file_name: &str,
         status: Arc<Mutex<RequestStatus>>,
-        repaint: Arc<dyn RepaintSignal>,
+        frame: epi::Frame,
     ) -> anyhow::Result<()> {
         let segments = match which {
             VersionsTypes::Packages => package_segments(),
@@ -216,7 +216,7 @@ impl VersionsClient {
                     *status.lock().unwrap() = RequestStatus::Error;
                 }
             }
-            repaint.request_repaint();
+            frame.request_repaint();
         });
 
         Ok(())
@@ -227,7 +227,7 @@ impl VersionsClient {
         &self,
         path: &Path,
         status: Option<Arc<Mutex<RequestStatus>>>,
-        repaint: Option<Arc<dyn RepaintSignal>>,
+        frame: Option<epi::Frame>,
     ) -> anyhow::Result<std::thread::JoinHandle<()>> {
         let url = format!(
             "{}/{}/{}",
@@ -250,8 +250,8 @@ impl VersionsClient {
                 }
                 _ => {}
             }
-            if let Some(repaint) = repaint {
-                repaint.request_repaint();
+            if let Some(frame) = frame {
+                frame.request_repaint();
             }
         });
 
