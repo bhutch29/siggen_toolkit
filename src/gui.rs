@@ -542,7 +542,7 @@ impl GuiApp {
         }
         if ui.button("Save").clicked() {
             self.logger.remove_error = false;
-            self.logger.write_error = logging::set_config(&path_info.path, self.logger.config.clone()).is_err();
+            self.logger.write_error = self.model.logging_set_config(&path_info.path, self.logger.config.clone()).is_err();
             if !self.logger.write_error {
                 self.logger.loaded_from = Some(path_info.path.clone());
             }

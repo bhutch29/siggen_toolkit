@@ -207,7 +207,6 @@ pub fn get_config_from(path: &Path) -> Option<LoggingConfiguration> {
         .and_then(|contents| serde_json::from_str(&contents).ok())
 }
 
-// TODO: backend
 pub fn set_config(path: &Path, config: LoggingConfiguration) -> anyhow::Result<()> {
     std::fs::write(path, serde_json::to_string_pretty(&config)?)?;
     Ok(())

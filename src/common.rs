@@ -6,8 +6,8 @@ pub fn in_cwd<P: AsRef<Path>>(file: P) -> PathBuf {
     std::env::current_dir().unwrap().join(file)
 }
 
-// TODO: backend
 pub fn open_explorer(path: &Path) -> anyhow::Result<()> {
+    // TODO: do nothing if wasm
     process::Command::new(if cfg!(windows) { "explorer" } else { "xdg-open" })
         .arg(path.parent().unwrap())
         .spawn()?;
