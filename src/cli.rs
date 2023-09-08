@@ -20,7 +20,9 @@ pub enum Command {
     #[structopt(about = "Run only the backend HTTP server.")]
     Backend,
     #[structopt(about = "Run only the GUI to connect to a running backend.")]
-    Frontend,
+    Frontend {
+        url: Option<String>
+    },
     #[structopt(name = "hwconfig", about = "Simulated hardware configuration.")]
     HwConfig(HwConfigCommand),
     #[structopt(about = "Logging configuration.")]

@@ -33,7 +33,7 @@ fn main() -> anyhow::Result<()> {
             server::main();
             Ok(())
         }
-        Some(Command::Frontend) => gui::run(Box::new(HttpClientModel::default())),
+        Some(Command::Frontend{url}) => gui::run(Box::new(HttpClientModel::new(url.unwrap_or("localhost:8000".to_string())))),
         Some(command) => cli::run(command),
     }
 }

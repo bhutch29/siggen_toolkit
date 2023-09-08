@@ -33,18 +33,8 @@ pub trait Model {
 pub struct NativeModel;
 
 pub struct HttpClientModel {
+    url: String,
     client: reqwest::blocking::Client,
-}
-
-impl Default for HttpClientModel {
-    fn default() -> Self {
-        Self {
-            client: reqwest::blocking::Client::builder()
-                .timeout(Duration::from_secs(1000))
-                .build()
-                .expect("Unable to create web client"),
-        }
-    }
 }
 
 impl Model for NativeModel {
@@ -119,8 +109,18 @@ impl Model for NativeModel {
 }
 
 impl HttpClientModel {
+    pub fn new(url: String) -> Self {
+        Self {
+            url: url,
+            client: reqwest::blocking::Client::builder()
+                .timeout(Duration::from_secs(1000))
+                .build()
+                .expect("Unable to create web client"),
+        }
+    }
+
     fn create_get_request(&self, stem: &str) -> reqwest::blocking::RequestBuilder {
-        self.client.get(format!("{}/{}", "http://localhost:8000", stem)) // TODO: URL
+        self.client.get(format!("{}/{}", format!("http://{}", self.url), stem))
     }
 }
 
@@ -211,8 +211,9 @@ impl Model for HttpClientModel {
         let response = self
             .client
             .post(format!(
-                "{}/{}",
-                "http://localhost:8000", // TODO: url
+                "{}{}/{}",
+                "http://",
+                self.url,
                 &format!("logging/config{}", path.to_string_lossy())
             ))
             .body(serde_json::to_string(&config)?)
@@ -326,8 +327,9 @@ impl Model for HttpClientModel {
         let response = self
             .client
             .post(format!(
-                "{}/{}",
-                "http://localhost:8000", // TODO: url
+                "{}{}/{}",
+                "http://",
+                self.url,
                 &format!("reports/create/{}", name)
             ))
             .send();
