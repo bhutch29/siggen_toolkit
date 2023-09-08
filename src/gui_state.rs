@@ -275,18 +275,18 @@ impl LogViewerState {
     pub fn load_file_data(&mut self) {
         let path = PathBuf::from(self.file_path.clone());
         if !path.exists() {
-            // TODO
+            // TODO LOG_VIEWER
             return;
         }
 
-        let file = File::open(path).unwrap(); // TODO: error handling
+        let file = File::open(path).unwrap(); // TODO LOG_VIEWER: error handling
         let reader = BufReader::new(file);
 
         let data = self.file_data.clone();
         std::thread::spawn(move || {
             data.lock().unwrap().clear();
             for (_, line) in reader.lines().enumerate() {
-                data.lock().unwrap().push(&format!("{}\n", line.unwrap())); // TODO: error handling
+                data.lock().unwrap().push(&format!("{}\n", line.unwrap())); // TODO LOG_VIEWER: error handling
             }
         });
     }

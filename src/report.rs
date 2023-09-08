@@ -11,7 +11,8 @@ pub fn create_report(name: &str) -> anyhow::Result<()> {
 
     let mut summary = format!("Report Name: {}\n", name);
 
-    // TODO: include tool version in summary
+    const VERSION: &str = env!("CARGO_PKG_VERSION");
+    writeln!(summary, "Toolkit Version: {}", VERSION)?;
 
     if let Some(version) = versions::installed_version() {
         writeln!(summary, "Installed SigGen Version: {}", version)?;
@@ -75,7 +76,6 @@ pub fn zip_file_name(name: &str) -> String {
     )
 }
 
-// TODO: backend
 fn add_file(zip: &mut zip::ZipWriter<std::fs::File>, path: PathBuf) -> anyhow::Result<()> {
     let name = path.file_name().unwrap().to_string_lossy();
     zip.start_file(format!("{}/{}", "config", name), Default::default())?;

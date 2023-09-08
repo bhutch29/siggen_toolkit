@@ -81,7 +81,7 @@ impl Data {
 
         match Item::from_str(data) {
             Ok(new_item) => {
-                // TODO: analyze Item and populate necessary databases
+                // TODO LOG_VIEWER: analyze Item and populate necessary databases
                 self.items.push(self.pending_item.take().unwrap());
                 self.pending_item = Some(new_item);
             }
