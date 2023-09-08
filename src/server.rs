@@ -95,7 +95,7 @@ fn delete_file(path: PathBuf) -> std::io::Result<()> {
     std::fs::remove_file(path)
 }
 
-#[get("/reports/exception-log-path", format = "json")]
+#[get("/hwconfig/path", format = "json")]
 fn get_hwconfig_path() -> Json<Option<PathBuf>> {
     Json(hwconfig::get_path())
 }
