@@ -255,12 +255,14 @@ pub const FILE_NAME: &str = "ksflogger.cfg";
 #[cfg(windows)]
 const CODE_DEFINED_LOG_PATH: &str = r"C:\Temp\Keysight.PathWave.SG.log";
 
+// TODO: ARM path
 #[cfg(not(windows))]
 const CODE_DEFINED_LOG_PATH: &str = "/tmp/Keysight.PathWave.SG.log";
 
 #[cfg(windows)]
 const EXCEPTION_LOG_PATH: &str = r"C:\Temp\Keysight.PathWave.SG.ExceptionLog.txt";
 
+// TODO: ARM path
 #[cfg(not(windows))]
 const EXCEPTION_LOG_PATH: &str = "/tmp/Keysight.PathWave.SG.ExceptionLog.txt";
 
