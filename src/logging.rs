@@ -167,7 +167,7 @@ pub enum Template {
     MonitorSghalSetups,
     Mobius,
     Websockets,
-    #[strum(serialize = "Multi-Instrument/Grpc")]
+    #[strum(serialize = "MultiInstrument")]
     MultiInstrumentGrpc,
     Licensing,
 }

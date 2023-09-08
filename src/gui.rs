@@ -93,10 +93,12 @@ impl epi::App for GuiApp {
                 }
                 Some(Tabs::Packages) => {
                     let selected_branch = self.packages.selected_branch.clone();
+                    // TODO: remove model call from render loop
                     versions(ui, frame, &mut self.packages, &self.model.versions_download_dir(&selected_branch));
                 }
                 Some(Tabs::Installers) => {
                     let selected_branch = self.packages.selected_branch.clone();
+                    // TODO: remove model call from render loop
                     versions(ui, frame, &mut self.installers, &self.model.versions_download_dir(&selected_branch));
                 }
                 Some(Tabs::Reports) => {
