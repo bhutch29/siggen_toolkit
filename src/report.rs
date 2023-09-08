@@ -3,7 +3,6 @@ use std::fmt::Write as fmtWrite;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 
-// TODO: backend
 pub fn create_report(name: &str) -> anyhow::Result<()> {
     let file_name = zip_file_name(name);
     let file = std::fs::File::create(&file_name).unwrap();

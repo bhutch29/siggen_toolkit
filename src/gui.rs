@@ -225,7 +225,7 @@ impl GuiApp {
                 !self.reports.name.is_empty() && self.reports.generate_status != Some(true),
                 |ui| {
                     if ui.button("Generate Report").clicked() {
-                        self.reports.generate_status = match report::create_report(&self.reports.name) {
+                        self.reports.generate_status = match self.model.report_create_report(&self.reports.name) {
                             Ok(_) => Some(true),
                             Err(_) => Some(false),
                         };

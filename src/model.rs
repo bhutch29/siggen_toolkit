@@ -16,6 +16,7 @@ pub trait Model {
     fn get_exception_log_path(&self) -> PathBuf;
     fn report_get_data_dir_state_file_paths(&self) -> Vec<String>;
     fn report_zip_file_name(&self, name: &str) -> String;
+    fn report_create_report(&self, name: &str) -> anyhow::Result<()>;
 }
 
 #[derive(Default)]
@@ -77,6 +78,10 @@ impl Model for NativeModel {
 
     fn report_zip_file_name(&self, name: &str) -> String {
         report::zip_file_name(name)
+    }
+
+    fn report_create_report(&self, name: &str) -> anyhow::Result<()> {
+        report::create_report(name)
     }
 }
 
@@ -146,7 +151,7 @@ impl Model for HttpClientModel {
             .client
             .post(format!(
                 "{}/{}",
-                "http://localhost:8000",
+                "http://localhost:8000", // TODO: url
                 &format!("logging/config{}", path.to_string_lossy())
             ))
             .body(serde_json::to_string(&config)?)
@@ -234,6 +239,26 @@ impl Model for HttpClientModel {
             Err(err) => {
                 println!("{:?}", err);
                 Default::default()
+            }
+        }
+    }
+
+    fn report_create_report(&self, name: &str) -> anyhow::Result<()> {
+        #[cfg(debug_assertions)]
+        println!("Sending report_create_report request: {}", name);
+        let response = self
+            .client
+            .post(format!(
+                "{}/{}",
+                "http://localhost:8000", // TODO: url
+                &format!("reports/create/{}", name)
+            ))
+            .send();
+        match response {
+            Ok(_) => Ok(()),
+            Err(err) => {
+                println!("{:?}", err);
+                Result::Err(err.into())
             }
         }
     }
