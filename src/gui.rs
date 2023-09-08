@@ -295,6 +295,7 @@ impl GuiApp {
     }
 
     fn upload_clicked(&self, frame: &epi::Frame, path: &Path) {
+        // TODO: backend
         if self
             .packages
             .client
@@ -1067,6 +1068,7 @@ fn download_clicked(frame: &epi::Frame, state: &mut VersionsState, file_info: &F
     .entry((state.selected_branch.clone(), file_info.clone()))
     .or_insert_with(|| std::sync::Arc::from(std::sync::Mutex::from(RequestStatus::Idle)));
 
+    // TODO: backend
     if state
         .client
         .download_package(
