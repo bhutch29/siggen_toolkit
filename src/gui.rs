@@ -452,7 +452,7 @@ impl GuiApp {
             ui.strong("Templates:");
             for template in Template::iter() {
                 if ui.button(template.to_string()).clicked() {
-                    self.logger.config = logging::get_template(&template);
+                    self.logger.config = self.model.logging_get_template(&template);
                     self.logger.loaded_from = None;
                 }
             }

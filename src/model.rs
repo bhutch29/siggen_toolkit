@@ -3,7 +3,7 @@ use std::{
     time::Duration,
 };
 
-use crate::{logging::{self, LoggingConfiguration}, common, report};
+use crate::{logging::{self, LoggingConfiguration, Template}, common, report};
 
 pub trait Model {
     fn name(&self) -> &str;
@@ -11,6 +11,7 @@ pub trait Model {
     fn logging_valid_paths(&self) -> Vec<PathBuf>;
     fn logging_get_config_from(&self, path: &Path) -> Option<LoggingConfiguration>;
     fn logging_set_config(&self, path: &Path, config: LoggingConfiguration) -> anyhow::Result<()>;
+    fn logging_get_template(&self, template: &Template) -> LoggingConfiguration;
     fn get_cwd(&self) -> PathBuf;
     fn get_code_defined_log_path(&self) -> PathBuf;
     fn get_exception_log_path(&self) -> PathBuf;
@@ -57,6 +58,10 @@ impl Model for NativeModel {
     fn logging_set_config(&self, path: &Path, config: LoggingConfiguration) -> anyhow::Result<()> {
         std::fs::write(path, serde_json::to_string_pretty(&config)?)?;
         Ok(())
+    }
+
+    fn logging_get_template(&self, template: &Template) -> LoggingConfiguration {
+        logging::get_template(template)
     }
 
     fn get_cwd(&self) -> PathBuf {
@@ -161,6 +166,23 @@ impl Model for HttpClientModel {
             Err(err) => {
                 println!("{:?}", err);
                 Result::Err(err.into())
+            }
+        }
+    }
+
+    fn logging_get_template(&self, template: &Template) -> LoggingConfiguration {
+        #[cfg(debug_assertions)]
+        println!("Sending logging_get_template request: {}", template.to_string());
+        let response = self
+            .create_get_request(&format!("logging/template/{}", template.to_string()))
+            .send();
+        match response {
+            Ok(response) => serde_json::from_str(&response.text().unwrap_or_default())
+                .ok()
+                .unwrap_or_default(),
+            Err(err) => {
+                println!("{:?}", err);
+                Default::default()
             }
         }
     }

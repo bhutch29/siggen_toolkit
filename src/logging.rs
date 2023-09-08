@@ -2,7 +2,7 @@ use crate::common::*;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use lazy_static::lazy_static;
-use strum::{Display, EnumIter};
+use strum::{Display, EnumIter, EnumString};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct LoggingConfiguration {
@@ -159,7 +159,7 @@ impl Default for Level {
     }
 }
 
-#[derive(Debug, Copy, Clone, EnumIter, Display)]
+#[derive(Debug, Copy, Clone, EnumIter, EnumString, Display)]
 pub enum Template {
     #[strum(serialize = "General Purpose")]
     GeneralPurpose,
@@ -386,7 +386,6 @@ lazy_static! {
     };
 }
 
-// TODO: backend
 pub fn get_template(template: &Template) -> LoggingConfiguration {
     match template {
         Template::GeneralPurpose => {TEMPLATE_GENERAL_PURPOSE.clone()}

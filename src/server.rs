@@ -1,8 +1,9 @@
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use crate::{ion_diagnostics, logging, report, common};
 use rocket::{serde::json::Json, get, post, launch, http::Status, delete};
 use crate::ion_diagnostics::DiagnosticsConfiguration;
-use crate::logging::LoggingConfiguration;
+use crate::logging::{LoggingConfiguration, Template};
 
 #[get("/cwd", format = "json")]
 fn get_cwd() -> Json<PathBuf> {
@@ -30,6 +31,11 @@ fn set_logging_config(path: PathBuf, config: Json<LoggingConfiguration>) -> Stat
         Ok(_) => {Status::Ok}
         Err(_) => {Status::InternalServerError}
     }
+}
+
+#[get("/logging/template/<template>", format = "json")]
+fn get_logging_template(template: &str) -> Option<Json<LoggingConfiguration>> {
+    Template::from_str(template).ok().map(|x| Json(logging::get_template(&x)))
 }
 
 #[get("/ion-diagnostics/config/<path..>", format = "json")]
@@ -87,6 +93,7 @@ pub fn rocket() -> _ {
         get_logging_code_path,
         get_logging_config,
         set_logging_config,
+        get_logging_template,
         get_ion_diagnostics_config,
         set_ion_diagnostics_config,
         create_report,
