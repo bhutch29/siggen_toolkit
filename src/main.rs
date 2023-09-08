@@ -1,20 +1,22 @@
 // TODO: This works to hide the console when launching the GUI but then hides the console output when using the CLI
 // #![windows_subsystem = "windows"] // Hides console on Windows
 
-use structopt::StructOpt;
 use crate::cli::{Command, Sgt};
+use model::{NativeModel, HttpClientModel};
+use structopt::StructOpt;
 
 mod cli;
 mod common;
 mod gui;
 mod gui_state;
 mod hwconfig;
-mod logging;
-mod report;
-mod versions;
 mod ion_diagnostics;
 mod log_viewer;
+mod logging;
+mod report;
 mod server;
+mod versions;
+mod model;
 
 fn main() -> anyhow::Result<()> {
     let args: Sgt = Sgt::from_args();
@@ -25,14 +27,13 @@ fn main() -> anyhow::Result<()> {
         println!();
     }
 
-    // TODO: hide irrelevant tabs, if any, when running remotely. hwconfig? versions?
     match args.command {
-        None => gui::run(), // TODO: inject native API
+        None => gui::run(Box::new(NativeModel::default())),
         Some(Command::Backend) => {
             server::main();
             Ok(())
-        },
-        Some(Command::Frontend) => gui::run(), // TODO: inject HTTP client API
+        }
+        Some(Command::Frontend) => gui::run(Box::new(HttpClientModel::default())),
         Some(command) => cli::run(command),
     }
 }

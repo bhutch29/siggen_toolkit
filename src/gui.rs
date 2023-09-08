@@ -1,6 +1,7 @@
 use crate::common::in_cwd;
 use crate::gui_state::{FilterOptions, HwconfigState, IonDiagnosticsState, LoggingState, LogViewerState, PathInfo, ReportsState, VersionsFilter, VersionsState, VersionsTypes};
 use crate::logging::{Bool, Level, Logger, Sink, Template};
+use crate::model::Model;
 use crate::versions::{FileInfo, RequestStatus, BASE_FILE_URL};
 use crate::{common, hwconfig, ion_diagnostics, log_viewer, logging, report, versions};
 use clipboard::ClipboardProvider;
@@ -34,6 +35,7 @@ enum Tabs {
 }
 
 struct GuiApp {
+    model: Box<dyn Model>,
     selected_tab: Option<Tabs>,
     hwconfig: HwconfigState,
     logger: LoggingState,
@@ -44,22 +46,6 @@ struct GuiApp {
     diagnostics: IonDiagnosticsState,
 
     cwd: PathBuf
-}
-
-impl Default for GuiApp {
-    fn default() -> Self {
-        Self {
-            hwconfig: Default::default(),
-            logger: Default::default(),
-            log_viewer: Default::default(),
-            packages: VersionsState::new(VersionsTypes::Packages),
-            installers: VersionsState::new(VersionsTypes::Installers),
-            reports: Default::default(),
-            diagnostics: Default::default(),
-            selected_tab: Some(Tabs::LoggingConfiguration),
-            cwd: Default::default(),
-        }
-    }
 }
 
 impl epi::App for GuiApp {
@@ -130,23 +116,34 @@ impl epi::App for GuiApp {
         self.cwd = in_cwd(PathBuf::new());
         self.logger.config = logging::get_config_from(&logging::get_path_or_cwd()).unwrap_or_default();
         self.logger.loaded_from = Some(logging::get_path_or_cwd());
-        self.logger.valid_paths = logging::valid_paths();
+        let logger_cwd_path = self.in_cwd(hwconfig::FILE_NAME);
+        self.logger.cwd_path_info = PathInfo {
+            path: logger_cwd_path.clone(),
+            file_exists: self.model.file_exists(&logger_cwd_path)
+        };
+        for path in logging::valid_paths().iter() {
+            self.logger.valid_paths_info.push(PathInfo { path: path.clone(), file_exists: self.model.file_exists(path) });
+        }
 
-        self.diagnostics.ion_debug_dir = std::env::var(ion_diagnostics::ENV_VAR).ok().map(|x| PathBuf::from(x).join(ion_diagnostics::FILE_NAME));
-        let path = match self.diagnostics.ion_debug_dir.clone() {
+        let ion_debug_dir = std::env::var(ion_diagnostics::ENV_VAR).ok().map(|x| PathBuf::from(x).join(ion_diagnostics::FILE_NAME));
+        let path = match ion_debug_dir.clone() {
             Some(x) if x.exists() => { x }
             _ => { self.in_cwd(ion_diagnostics::FILE_NAME) }
         };
+        self.diagnostics.ion_debug_dir_info = ion_debug_dir.map(|_| PathInfo {
+            path: path.clone(),
+            file_exists: self.model.file_exists(&path)
+        });
         self.diagnostics.config = ion_diagnostics::get_config_from(&path).unwrap_or_default();
         self.diagnostics.loaded_from = Some(path);
 
         let hwconfig_cwd_path = self.in_cwd(hwconfig::FILE_NAME);
         self.hwconfig.cwd_path_info = PathInfo {
             path: hwconfig_cwd_path.clone(),
-            file_exists: self.file_exists(&hwconfig_cwd_path)
+            file_exists: self.model.file_exists(&hwconfig_cwd_path)
         };
         for path in hwconfig::valid_paths().iter() {
-            self.hwconfig.valid_paths_info.push(PathInfo { path: path.clone(), file_exists: self.file_exists(path) });
+            self.hwconfig.valid_paths_info.push(PathInfo { path: path.clone(), file_exists: self.model.file_exists(path) });
         }
 
         self.update_report_summary();
@@ -162,6 +159,21 @@ impl epi::App for GuiApp {
 }
 
 impl GuiApp {
+    fn new(model: Box<dyn Model>) -> Self {
+        Self {
+            model: model,
+            hwconfig: Default::default(),
+            logger: Default::default(),
+            log_viewer: Default::default(),
+            packages: VersionsState::new(VersionsTypes::Packages),
+            installers: VersionsState::new(VersionsTypes::Installers),
+            reports: Default::default(),
+            diagnostics: Default::default(),
+            selected_tab: Some(Tabs::LoggingConfiguration),
+            cwd: Default::default(),
+        }
+    }
+
     fn make_tab(&mut self, ui: &mut Ui, tab: Option<Tabs>) {
         let text = match tab {
             None => "About".to_string(),
@@ -188,7 +200,7 @@ impl GuiApp {
         if self.reports.name_changed() {
             self.reports.zip_file_path = self.in_cwd(report::zip_file_name(&self.reports.name));
             self.reports.generate_status = None;
-            self.reports.file_exists = self.file_exists(&self.reports.zip_file_path);
+            self.reports.file_exists = self.model.file_exists(&self.reports.zip_file_path);
             *self.reports.upload_status.lock().unwrap() = RequestStatus::Idle;
         }
 
@@ -220,7 +232,7 @@ impl GuiApp {
                             Ok(_) => Some(true),
                             Err(_) => Some(false),
                         };
-                        self.reports.file_exists = self.file_exists(path);
+                        self.reports.file_exists = self.model.file_exists(path);
                         *self.reports.upload_status.lock().unwrap() = RequestStatus::Idle;
                     }
                 },
@@ -428,17 +440,12 @@ impl GuiApp {
         });
         ui.separator();
         ui.strong("Paths indexed by SigGen:");
-        for path in self.logger.valid_paths.clone().iter() {
+        for path in self.logger.valid_paths_info.clone().iter() {
             self.logging_path(ui, path);
         }
         ui.collapsing("Other Paths", |ui| {
             ui.strong("Current working directory:");
-            self.logging_path(ui, &self.in_cwd(logging::FILE_NAME));
-            ui.strong("Custom:");
-            ui.horizontal(|ui| {
-                ui.text_edit_singleline(&mut self.logger.custom_path);
-                self.logging_path_buttons(ui, PathBuf::from(&self.logger.custom_path));
-            });
+            self.logging_path(ui, &self.logger.cwd_path_info.clone());
         });
         ui.separator();
 
@@ -515,35 +522,35 @@ impl GuiApp {
     }
 
 
-    fn logging_path(&mut self, ui: &mut Ui, path: &Path) {
+    fn logging_path(&mut self, ui: &mut Ui, path_info: &PathInfo) {
         ui.horizontal(|ui| {
-            copyable_path(ui, path);
-            self.logging_path_buttons(ui, PathBuf::from(path));
+            copyable_path(ui, &path_info.path);
+            self.logging_path_buttons(ui, path_info);
         });
     }
 
-    fn logging_path_buttons(&mut self, ui: &mut Ui, path: PathBuf) {
-        ui.label(if self.logger.loaded_from.as_ref() == Some(&path) {
+    fn logging_path_buttons(&mut self, ui: &mut Ui, path_info: &PathInfo) {
+        ui.label(if self.logger.loaded_from.as_ref() == Some(&path_info.path) {
             "⬅"
         } else {
             "     "
         });
 
-        if ui.add_enabled(self.file_exists(&path), egui::Button::new("Load")).clicked() {
-            self.logger.config = logging::get_config_from(&path).unwrap_or_default();
-            self.logger.loaded_from = Some(path.clone());
+        if ui.add_enabled(path_info.file_exists, egui::Button::new("Load")).clicked() {
+            self.logger.config = logging::get_config_from(&path_info.path).unwrap_or_default();
+            self.logger.loaded_from = Some(path_info.path.clone());
         }
         if ui.button("Save").clicked() {
             self.logger.remove_error = false;
-            self.logger.write_error = logging::set_config(&path, self.logger.config.clone()).is_err();
+            self.logger.write_error = logging::set_config(&path_info.path, self.logger.config.clone()).is_err();
             if !self.logger.write_error {
-                self.logger.loaded_from = Some(path.clone());
+                self.logger.loaded_from = Some(path_info.path.clone());
             }
         }
-        if ui.add_enabled(self.file_exists(&path), egui::Button::new("Delete")).clicked() {
+        if ui.add_enabled(path_info.file_exists, egui::Button::new("Delete")).clicked() {
             self.logger.write_error = false;
-            self.logger.remove_error = self.remove_file(&path).is_err();
-            if self.logger.loaded_from == Some(path) {
+            self.logger.remove_error = self.remove_file(&path_info.path).is_err();
+            if self.logger.loaded_from == Some(path_info.path.clone()) {
                 self.logger.loaded_from = None;
             }
         }
@@ -665,20 +672,13 @@ impl GuiApp {
             ui.hyperlink_to("Confluence Page", ion_diagnostics::CONFLUENCE_URL);
         });
         ui.separator();
-        if self.diagnostics.ion_debug_dir.is_none() {
+        if self.diagnostics.ion_debug_dir_info.is_none() {
             ui.label(format!("{} environment variable must be set!", ion_diagnostics::ENV_VAR));
             ui.label("Configure the environment variable then rerun this application.");
             return
         }
         ui.strong("Paths indexed by Ion:");
-        self.diagnostics_path(ui, &self.diagnostics.ion_debug_dir.clone().unwrap());
-        ui.strong("Current working directory:");
-        self.diagnostics_path(ui, &self.in_cwd(ion_diagnostics::FILE_NAME));
-        ui.strong("Custom:");
-        ui.horizontal(|ui| {
-            ui.text_edit_singleline(&mut self.diagnostics.custom_path);
-            self.diagnostics_path_buttons(ui, PathBuf::from(&self.diagnostics.custom_path));
-        });
+        self.diagnostics_path(ui, &self.diagnostics.ion_debug_dir_info.clone().unwrap());
         ui.separator();
 
         ui.columns(2, |columns| {
@@ -837,35 +837,35 @@ impl GuiApp {
         });
     }
 
-    fn diagnostics_path(&mut self, ui: &mut Ui, path: &Path) {
+    fn diagnostics_path(&mut self, ui: &mut Ui, path_info: &PathInfo) {
         ui.horizontal(|ui| {
-            copyable_path(ui, path);
-            self.diagnostics_path_buttons(ui, PathBuf::from(path));
+            copyable_path(ui, &path_info.path);
+            self.diagnostics_path_buttons(ui, path_info);
         });
     }
 
-    fn diagnostics_path_buttons(&mut self, ui: &mut Ui, path: PathBuf) {
-        ui.label(if self.diagnostics.loaded_from.as_ref() == Some(&path) {
+    fn diagnostics_path_buttons(&mut self, ui: &mut Ui, path_info: &PathInfo) {
+        ui.label(if self.diagnostics.loaded_from.as_ref() == Some(&path_info.path) {
             "⬅"
         } else {
             "     "
         });
 
-        if ui.add_enabled(self.file_exists(&path), egui::Button::new("Load")).clicked() {
-            self.diagnostics.config = ion_diagnostics::get_config_from(&path).unwrap_or_default();
-            self.diagnostics.loaded_from = Some(path.clone());
+        if ui.add_enabled(path_info.file_exists, egui::Button::new("Load")).clicked() {
+            self.diagnostics.config = ion_diagnostics::get_config_from(&path_info.path).unwrap_or_default();
+            self.diagnostics.loaded_from = Some(path_info.path.clone());
         }
         if ui.button("Save").clicked() {
             self.diagnostics.remove_error = false;
-            self.diagnostics.write_error = ion_diagnostics::set_config(&path, self.diagnostics.config.clone()).is_err();
+            self.diagnostics.write_error = ion_diagnostics::set_config(&path_info.path, self.diagnostics.config.clone()).is_err();
             if !self.diagnostics.write_error {
-                self.diagnostics.loaded_from = Some(path.clone());
+                self.diagnostics.loaded_from = Some(path_info.path.clone());
             }
         }
-        if ui.add_enabled(self.file_exists(&path), egui::Button::new("Delete")).clicked() {
+        if ui.add_enabled(path_info.file_exists, egui::Button::new("Delete")).clicked() {
             self.diagnostics.write_error = false;
-            self.diagnostics.remove_error = self.remove_file(&path).is_err();
-            if self.diagnostics.loaded_from == Some(path) {
+            self.diagnostics.remove_error = self.remove_file(&path_info.path).is_err();
+            if self.diagnostics.loaded_from == Some(path_info.path.clone()) {
                 self.diagnostics.loaded_from = None;
             }
         }
@@ -919,10 +919,6 @@ impl GuiApp {
 
     fn in_cwd<P: AsRef<Path>>(&self, file: P) -> PathBuf {
         self.cwd.join(file)
-    }
-
-    fn file_exists(&self, path: &Path) -> bool {
-        path.exists() && path.is_file()
     }
 
     fn remove_file(&self, path: &Path) -> io::Result<()> {
@@ -1186,8 +1182,12 @@ fn filter_dropdown(
     });
 }
 
-pub fn run() -> anyhow::Result<()> {
-    let app = GuiApp::default();
+pub fn run(model: Box<dyn Model>) -> anyhow::Result<()> {
+    if cfg!(debug_assertions) {
+        println!("Model: {}", model.name());
+    }
+
+    let app = GuiApp::new(model);
 
     let icon_bytes = include_bytes!("../keysight-logo-gear.ico");
     let options = match image::load_from_memory_with_format(icon_bytes, image::ImageFormat::Ico) {

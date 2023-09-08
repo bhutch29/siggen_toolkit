@@ -27,22 +27,21 @@ pub struct HwconfigState {
 #[derive(Default)]
 pub struct LoggingState {
     pub config: LoggingConfiguration,
-    pub custom_path: String,
     pub loaded_from: Option<PathBuf>,
     pub write_error: bool,
     pub remove_error: bool,
     pub advanced: bool,
-    pub valid_paths: Vec<PathBuf>
+    pub cwd_path_info: PathInfo,
+    pub valid_paths_info: Vec<PathInfo>
 }
 
 #[derive(Default)]
 pub struct IonDiagnosticsState {
     pub config: DiagnosticsConfiguration,
-    pub custom_path: String,
     pub loaded_from: Option<PathBuf>,
     pub write_error: bool,
     pub remove_error: bool,
-    pub ion_debug_dir: Option<PathBuf>,
+    pub ion_debug_dir_info: Option<PathInfo>,
 }
 
 /// Recursive data structure. Intended to hold Major, Minor, and Patch versions as keys in nested maps
