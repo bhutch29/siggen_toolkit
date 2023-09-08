@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use crate::{ion_diagnostics, logging, report, common, hwconfig};
+use crate::{ion_diagnostics, logging, report, common, hwconfig, versions};
 use rocket::{serde::json::Json, get, post, launch, http::Status, delete};
 use crate::ion_diagnostics::DiagnosticsConfiguration;
 use crate::logging::{LoggingConfiguration, Template};
@@ -100,6 +100,16 @@ fn get_hwconfig_path() -> Json<Option<PathBuf>> {
     Json(hwconfig::get_path())
 }
 
+#[get("/versions/installed", format = "json")]
+fn get_versions_installed_version() -> Json<Option<String>> {
+    Json(versions::installed_version())
+}
+
+#[get("/versions/download-dir/<branch>", format = "json")]
+fn get_versions_download_dir(branch: String) -> Json<PathBuf> {
+    Json(versions::download_dir(&branch))
+}
+
 #[launch]
 pub fn rocket() -> _ {
     rocket::build().mount("/", rocket::routes![
@@ -119,6 +129,8 @@ pub fn rocket() -> _ {
         get_report_zip_file_name,
         get_file_exists,
         delete_file,
-        get_hwconfig_path
+        get_hwconfig_path,
+        get_versions_installed_version,
+        get_versions_download_dir
     ])
 }

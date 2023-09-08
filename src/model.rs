@@ -26,6 +26,7 @@ pub trait Model {
     fn report_create_report(&self, name: &str) -> anyhow::Result<()>;
     fn versions_download_dir(&self, branch: &str) -> PathBuf;
     fn hwconfig_get_path(&self) -> Option<PathBuf>;
+    fn installed_version(&self) -> Option<String>;
 }
 
 #[derive(Default)]
@@ -110,6 +111,10 @@ impl Model for NativeModel {
 
     fn hwconfig_get_path(&self) -> Option<PathBuf> {
         hwconfig::get_path()
+    }
+
+    fn installed_version(&self) -> Option<String> {
+        versions::installed_version()
     }
 }
 
@@ -356,6 +361,21 @@ impl Model for HttpClientModel {
         #[cfg(debug_assertions)]
         println!("Sending hwconfig_get_path request");
         let response = self.create_get_request("hwconfig/path").send();
+        match response {
+            Ok(response) => serde_json::from_str(&response.text().unwrap_or_default())
+                .ok()
+                .unwrap_or_default(),
+            Err(err) => {
+                println!("{:?}", err);
+                Default::default()
+            }
+        }
+    }
+
+    fn installed_version(&self) -> Option<String> {
+        #[cfg(debug_assertions)]
+        println!("Sending installed_version request");
+        let response = self.create_get_request("versions/installed").send();
         match response {
             Ok(response) => serde_json::from_str(&response.text().unwrap_or_default())
                 .ok()

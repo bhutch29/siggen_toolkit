@@ -384,8 +384,7 @@ impl GuiApp {
         self.reports.data_dir_state_files = self.model.report_get_data_dir_state_file_paths();
 
         self.reports.hwconfig_path = self.model.hwconfig_get_path();
-        // TODO: backend
-        self.reports.installed_version = versions::installed_version();
+        self.reports.installed_version = self.model.versions_installed_version();
 
         self.reports.generate_status = None;
         *self.reports.upload_status.lock().unwrap() = RequestStatus::Idle;
