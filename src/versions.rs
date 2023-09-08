@@ -222,7 +222,7 @@ impl VersionsClient {
         Ok(())
     }
 
-    // TODO: backend
+    // TODO: backend: handle status/frame
     pub fn upload_report(
         &self,
         path: &Path,
@@ -368,14 +368,12 @@ fn upload_report_internal(client: &Arc<reqwest::blocking::Client>, url: &str, pa
 }
 
 pub fn installed_version() -> Option<String> {
-    if cfg!(windows) {
-        std::fs::read_to_string(r"C:\Program Files\Keysight\PathWave\SignalGenerator\package.json")
-            .ok()
-            .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
-            .map(|json| json["version"].to_string().trim_matches('"').to_string())
-    } else {
-        None
-    }
+    let package_json_path = if cfg!(windows) { r"C:\Program Files\Keysight\PathWave\SignalGenerator\instrument\package.json" } else { "/firmware/user/bin/instrument/package.json" };
+
+    std::fs::read_to_string(package_json_path)
+        .ok()
+        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+        .map(|json| json["version"].to_string().trim_matches('"').to_string())
 }
 
 pub fn package_segments() -> String {

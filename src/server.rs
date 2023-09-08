@@ -10,6 +10,11 @@ fn get_cwd() -> Json<PathBuf> {
     Json(common::in_cwd(PathBuf::new()))
 }
 
+#[get("/logging/path", format = "json")]
+fn get_logging_path() -> Json<Option<PathBuf>> {
+    Json(logging::get_path())
+}
+
 #[get("/logging/valid-paths", format = "json")]
 fn get_logging_valid_paths() -> Json<Vec<PathBuf>> {
     Json(logging::valid_paths())
@@ -89,6 +94,7 @@ fn delete_file(path: PathBuf) -> std::io::Result<()> {
 pub fn rocket() -> _ {
     rocket::build().mount("/", rocket::routes![
         get_cwd,
+        get_logging_path,
         get_logging_valid_paths,
         get_logging_code_path,
         get_logging_config,

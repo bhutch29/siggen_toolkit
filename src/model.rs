@@ -8,6 +8,7 @@ use crate::{logging::{self, LoggingConfiguration, Template}, common, report};
 pub trait Model {
     fn name(&self) -> &str;
     fn file_exists(&self, path: &Path) -> bool;
+    fn logging_get_path(&self) -> Option<PathBuf>;
     fn logging_valid_paths(&self) -> Vec<PathBuf>;
     fn logging_get_config_from(&self, path: &Path) -> Option<LoggingConfiguration>;
     fn logging_set_config(&self, path: &Path, config: LoggingConfiguration) -> anyhow::Result<()>;
@@ -45,6 +46,10 @@ impl Model for NativeModel {
 
     fn file_exists(&self, path: &Path) -> bool {
         path.exists() && path.is_file()
+    }
+
+    fn logging_get_path(&self) -> Option<PathBuf> {
+        logging::get_path()
     }
 
     fn logging_valid_paths(&self) -> Vec<PathBuf> {
@@ -108,6 +113,20 @@ impl Model for HttpClientModel {
             .create_get_request(&format!("file-exists{}", path.to_string_lossy()))
             .send();
         match response {
+            Ok(response) => serde_json::from_str(&response.text().unwrap_or_default())
+                .ok()
+                .unwrap_or_default(),
+            Err(err) => {
+                println!("{:?}", err);
+                Default::default()
+            }
+        }
+    }
+
+    fn logging_get_path(&self) -> Option<PathBuf> {
+        #[cfg(debug_assertions)]
+        println!("Sending logging_get_path request");
+        match self.create_get_request("logging/path").send() {
             Ok(response) => serde_json::from_str(&response.text().unwrap_or_default())
                 .ok()
                 .unwrap_or_default(),

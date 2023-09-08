@@ -1,8 +1,8 @@
-use crate::gui_state::{FilterOptions, HwconfigState, IonDiagnosticsState, LoggingState, LogViewerState, PathInfo, ReportsState, VersionsFilter, VersionsState, VersionsTypes};
+use crate::gui_state::{FilterOptions, HwconfigState, IonDiagnosticsState, LoggingState, PathInfo, ReportsState, VersionsFilter, VersionsState, VersionsTypes};
 use crate::logging::{Bool, Level, Logger, Sink, Template};
 use crate::model::Model;
 use crate::versions::{FileInfo, RequestStatus, BASE_FILE_URL};
-use crate::{common, hwconfig, ion_diagnostics, log_viewer, logging, report, versions};
+use crate::{common, hwconfig, ion_diagnostics, logging, report, versions};
 use clipboard::ClipboardProvider;
 use eframe::egui::Visuals;
 use eframe::{egui, egui::Ui, epi};
@@ -26,8 +26,8 @@ enum Tabs {
     IonDiagnostics,
     #[strum(serialize = "Hardware Configuration")]
     HwConfig,
-    #[strum(serialize = "Log Viewer")]
-    LogViewer,
+    // #[strum(serialize = "Log Viewer")]
+    // LogViewer,
     Packages,
     Installers,
     Reports,
@@ -38,7 +38,7 @@ struct GuiApp {
     selected_tab: Option<Tabs>,
     hwconfig: HwconfigState,
     logger: LoggingState,
-    log_viewer: LogViewerState,
+    // log_viewer: LogViewerState,
     packages: VersionsState,
     installers: VersionsState,
     reports: ReportsState,
@@ -57,12 +57,12 @@ impl epi::App for GuiApp {
                     }
                 });
                 ui.separator();
-                for tab in Tabs::iter() {
-                    // Hide LogViewer in Release builds for now
-                    if cfg!(debug_assertions) || tab != Tabs::LogViewer {
-                        self.make_tab(ui, Some(tab));
-                    }
-                }
+                // for tab in Tabs::iter() {
+                //     // Hide LogViewer in Release builds for now
+                //     if cfg!(debug_assertions) || tab != Tabs::LogViewer {
+                //         self.make_tab(ui, Some(tab));
+                //     }
+                // }
 
                 ui.with_layout(egui::Layout::right_to_left(), |ui| {
                     self.make_tab(ui, None);
@@ -100,9 +100,9 @@ impl epi::App for GuiApp {
                 Some(Tabs::IonDiagnostics) => {
                     self.diagnostics(ui);
                 }
-                Some(Tabs::LogViewer) => {
-                    self.log_viewer(ui);
-                }
+                // Some(Tabs::LogViewer) => {
+                //     self.log_viewer(ui);
+                // }
                 None => {
                     about(ui);
                 }
@@ -110,10 +110,14 @@ impl epi::App for GuiApp {
         });
     }
 
-    fn setup(&mut self, ctx: &egui::Context, frame: &epi::Frame, _storage: Option<&dyn epi::Storage>) {
+    fn setup(&mut self, ctx: &egui::Context, _frame: &epi::Frame, _storage: Option<&dyn epi::Storage>) {
+        // TODO: hide ion_diagnostics tab on wasm
+
         ctx.set_visuals(Visuals::dark());
         self.cwd = self.model.get_cwd();
+        // TODO: backend
         self.logger.config = self.model.logging_get_config_from(&logging::get_path_or_cwd()).unwrap_or_default();
+        // TODO: backend
         self.logger.loaded_from = Some(logging::get_path_or_cwd());
         let logger_cwd_path = self.in_cwd(hwconfig::FILE_NAME);
         self.logger.cwd_path_info = PathInfo {
@@ -147,9 +151,9 @@ impl epi::App for GuiApp {
 
         self.update_report_summary();
 
-        let stdin_data = self.log_viewer.stdin_data.clone();
-
-        log_viewer::watch_stdin(stdin_data, frame.clone());
+        // let stdin_data = self.log_viewer.stdin_data.clone();
+        //
+        // log_viewer::watch_stdin(stdin_data, frame.clone());
     }
 
     fn name(&self) -> &str {
@@ -163,7 +167,7 @@ impl GuiApp {
             model: model,
             hwconfig: Default::default(),
             logger: Default::default(),
-            log_viewer: Default::default(),
+            // log_viewer: Default::default(),
             packages: VersionsState::new(VersionsTypes::Packages),
             installers: VersionsState::new(VersionsTypes::Installers),
             reports: Default::default(),
@@ -318,13 +322,6 @@ impl GuiApp {
             }
         ));
         ui.monospace(format!(
-            "Host Name: {}",
-            match &self.reports.host_name {
-                None => "Not Found",
-                Some(hostname) => hostname,
-            }
-        ));
-        ui.monospace(format!(
             "Log File Path: {}",
             match &self.reports.log_file_path {
                 None => "Not Found".to_string(),
@@ -377,21 +374,20 @@ impl GuiApp {
         let path = self.model.get_exception_log_path();
         self.reports.exception_log_file_path = if path.exists() { Some(path) } else { None };
 
-        // TODO: backend
-        self.reports.log_cfg_path = logging::get_path();
+        self.reports.log_cfg_path = self.model.logging_get_path();
 
         let path = report::get_no_reset_system_settings_path();
         self.reports.no_reset_system_settings_path = if path.exists() { Some(path) } else { None };
 
         self.reports.data_dir_state_files = self.model.report_get_data_dir_state_file_paths();
 
+        // TODO: backend
         self.reports.hwconfig_path = hwconfig::get_path();
+        // TODO: backend
         self.reports.installed_version = versions::installed_version();
 
         self.reports.generate_status = None;
         *self.reports.upload_status.lock().unwrap() = RequestStatus::Idle;
-
-        self.reports.host_name = Some(gethostname::gethostname().to_string_lossy().to_string());
     }
 
     fn hwconfig(&mut self, ui: &mut Ui) {
@@ -877,44 +873,44 @@ impl GuiApp {
         }
     }
 
-    fn log_viewer(&mut self, ui: &mut Ui) {
-        ui.heading("Log Viewer (WIP)");
-
-        egui::ComboBox::from_label("Log Source")
-            .selected_text(format!("{}", self.log_viewer.source))
-            .show_ui(ui, |ui| {
-                ui.selectable_value(&mut self.log_viewer.source, log_viewer::Source::Stdin, "Stdin");
-                ui.selectable_value(&mut self.log_viewer.source, log_viewer::Source::File, "File");
-            });
-
-        match self.log_viewer.source {
-            log_viewer::Source::Stdin => {
-            }
-            log_viewer::Source::File => {
-                ui.strong("Path:");
-                ui.text_edit_singleline(&mut self.log_viewer.file_path);
-                if ui.button("Load").clicked() {
-                    self.log_viewer.load_file_data();
-                }
-            }
-        };
-
-        let data = match self.log_viewer.source {
-            log_viewer::Source::Stdin => {self.log_viewer.stdin_data.lock().unwrap()}
-            log_viewer::Source::File => {self.log_viewer.file_data.lock().unwrap()}
-        };
-
-        ui.label(data.items.len().to_string());
-
-        // egui::ScrollArea::vertical()
-        //     .id_source("log_viewer scroll")
-        //     .auto_shrink([false, false])
-        //     .show(ui, |ui| {
-        //         for item in data.items.iter() {
-        //             ui.label(format!("{:?}", item));
-        //         }
-        //     });
-    }
+    // fn log_viewer(&mut self, ui: &mut Ui) {
+    //     ui.heading("Log Viewer (WIP)");
+    //
+    //     egui::ComboBox::from_label("Log Source")
+    //         .selected_text(format!("{}", self.log_viewer.source))
+    //         .show_ui(ui, |ui| {
+    //             ui.selectable_value(&mut self.log_viewer.source, log_viewer::Source::Stdin, "Stdin");
+    //             ui.selectable_value(&mut self.log_viewer.source, log_viewer::Source::File, "File");
+    //         });
+    //
+    //     match self.log_viewer.source {
+    //         log_viewer::Source::Stdin => {
+    //         }
+    //         log_viewer::Source::File => {
+    //             ui.strong("Path:");
+    //             ui.text_edit_singleline(&mut self.log_viewer.file_path);
+    //             if ui.button("Load").clicked() {
+    //                 self.log_viewer.load_file_data();
+    //             }
+    //         }
+    //     };
+    //
+    //     let data = match self.log_viewer.source {
+    //         log_viewer::Source::Stdin => {self.log_viewer.stdin_data.lock().unwrap()}
+    //         log_viewer::Source::File => {self.log_viewer.file_data.lock().unwrap()}
+    //     };
+    //
+    //     ui.label(data.items.len().to_string());
+    //
+    //     // egui::ScrollArea::vertical()
+    //     //     .id_source("log_viewer scroll")
+    //     //     .auto_shrink([false, false])
+    //     //     .show(ui, |ui| {
+    //     //         for item in data.items.iter() {
+    //     //             ui.label(format!("{:?}", item));
+    //     //         }
+    //     //     });
+    // }
 
     fn in_cwd<P: AsRef<Path>>(&self, file: P) -> PathBuf {
         self.cwd.join(file)
@@ -961,6 +957,7 @@ fn versions(ui: &mut Ui, frame: &epi::Frame, state: &mut VersionsState) {
             });
         columns[0].horizontal(|ui| {
             ui.label("Download Directory:");
+            // TODO: backend
             copyable_path(ui, &versions::download_dir(&state.selected_branch));
         });
         columns[0].separator();
@@ -1108,7 +1105,7 @@ fn warning_label(ui: &mut Ui, label: &str) {
 fn copyable_path(ui: &mut Ui, path: &Path) {
     let label = ui
         .selectable_label(false, path.to_str().unwrap())
-        .on_hover_text("Left click to open in Explorer. Right click to copy."); // TODO: modify when in browser
+        .on_hover_text("Left click to open in Explorer. Right click to copy.");
 
     if label.clicked() && common::open_explorer(path).is_err() {
         // Do Nothing
