@@ -168,7 +168,8 @@ pub enum Template {
     Mobius,
     Websockets,
     #[strum(serialize = "Multi-Instrument/Grpc")]
-    MultiInstrumentGrpc
+    MultiInstrumentGrpc,
+    Licensing,
 }
 
 pub fn get_path() -> Option<PathBuf> {
@@ -297,17 +298,6 @@ lazy_static! {
                 level: Level::Info,
                 sinks: vec!["console".to_string(), "file".to_string()],
             },
-            Logger {
-                name: "mcs3".to_string(),
-                level: Level::Warn,
-                sinks: vec!["console".to_string(), "file".to_string()],
-            },
-            Logger {
-                name: "ion".to_string(),
-                level: Level::Warn,
-                sinks: vec!["console".to_string(), "file".to_string()],
-            },
-            // TODO
         ]
     };
     static ref TEMPLATE_SGHAL_SETUPS: LoggingConfiguration = LoggingConfiguration {
@@ -318,7 +308,11 @@ lazy_static! {
                 level: Level::Warn,
                 sinks: vec!["console".to_string(), "file".to_string()],
             },
-            // TODO
+            Logger {
+                name: "siggen.sghal".to_string(),
+                level: Level::Debug,
+                sinks: vec!["console".to_string(), "file".to_string()],
+            },
         ]
     };
 
@@ -330,7 +324,11 @@ lazy_static! {
                 level: Level::Warn,
                 sinks: vec!["console".to_string(), "file".to_string()],
             },
-            // TODO
+            Logger {
+                name: "siggen.mobius".to_string(),
+                level: Level::Debug,
+                sinks: vec!["console".to_string(), "file".to_string()],
+            },
         ]
     };
 
@@ -342,7 +340,16 @@ lazy_static! {
                 level: Level::Warn,
                 sinks: vec!["console".to_string(), "file".to_string()],
             },
-            // TODO
+            Logger {
+                name: "siggen.websocket".to_string(),
+                level: Level::Debug,
+                sinks: vec!["console".to_string(), "file".to_string()],
+            },
+            Logger {
+                name: "siggen.iws".to_string(),
+                level: Level::Debug,
+                sinks: vec!["console".to_string(), "file".to_string()],
+            },
         ]
     };
 
@@ -354,11 +361,32 @@ lazy_static! {
                 level: Level::Warn,
                 sinks: vec!["console".to_string(), "file".to_string()],
             },
-            // TODO
+            Logger {
+                name: "siggen.grpc".to_string(),
+                level: Level::Debug,
+                sinks: vec!["console".to_string(), "file".to_string()],
+            },
+        ]
+    };
+
+    static ref TEMPLATE_LICENSING: LoggingConfiguration = LoggingConfiguration {
+        sinks: DEFAULT_SINKS.clone(),
+        loggers: vec![
+            Logger {
+                name: "*".to_string(),
+                level: Level::Warn,
+                sinks: vec!["console".to_string(), "file".to_string()],
+            },
+            Logger {
+                name: "siggen.licensing".to_string(),
+                level: Level::Debug,
+                sinks: vec!["console".to_string(), "file".to_string()],
+            },
         ]
     };
 }
 
+// TODO: backend
 pub fn get_template(template: &Template) -> LoggingConfiguration {
     match template {
         Template::GeneralPurpose => {TEMPLATE_GENERAL_PURPOSE.clone()}
@@ -366,5 +394,6 @@ pub fn get_template(template: &Template) -> LoggingConfiguration {
         Template::Mobius => {TEMPLATE_MOBIUS.clone()}
         Template::Websockets => {TEMPLATE_WEBSOCKETS.clone()}
         Template::MultiInstrumentGrpc => {TEMPLATE_MULTI_INSTRUMENT.clone()}
+        Template::Licensing => {TEMPLATE_LICENSING.clone()}
     }
 }
