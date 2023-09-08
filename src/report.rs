@@ -68,7 +68,6 @@ pub fn create_report(name: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-// TODO: backend
 pub fn zip_file_name(name: &str) -> String {
     format!(
         "{}_{}.zip",
@@ -96,7 +95,6 @@ pub fn get_no_reset_system_settings_path() -> PathBuf {
         .join("SigGenInstrumentSpecificSettings.sgen")
 }
 
-// TODO: backend
 pub fn get_data_dir_state_file_paths() -> Vec<String> {
     dirs::data_dir()
         .and_then(|dir| {

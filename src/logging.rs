@@ -212,6 +212,10 @@ pub fn set_config(path: &Path, config: LoggingConfiguration) -> anyhow::Result<(
     Ok(())
 }
 
+pub fn get_code_defined_log_path() -> PathBuf {
+    PathBuf::from(CODE_DEFINED_LOG_PATH)
+}
+
 pub fn get_log_path() -> PathBuf {
     get_config_from(&get_path_or_cwd())
         .and_then(|config| {
@@ -222,7 +226,7 @@ pub fn get_log_path() -> PathBuf {
                 _ => None,
             })
         })
-        .unwrap_or_else(|| PathBuf::from(CODE_DEFINED_LOG_PATH))
+        .unwrap_or_else(|| get_code_defined_log_path())
 }
 
 pub fn get_exception_log_path() -> PathBuf {
@@ -247,7 +251,6 @@ pub fn remove_invalid_sinks(logger: &mut Logger, sinks: &[Sink]) {
 
 pub const FILE_NAME: &str = "ksflogger.cfg";
 
-// TODO: backend
 #[cfg(windows)]
 const CODE_DEFINED_LOG_PATH: &str = r"C:\Temp\Keysight.PathWave.SG.log";
 
@@ -270,7 +273,7 @@ lazy_static! {
         Sink::RotatingFile {
             level: Level::Trace,
             name: "file".to_string(),
-            file_name: CODE_DEFINED_LOG_PATH.to_string(),
+            file_name: get_code_defined_log_path().to_string_lossy().to_string(),
             truncate: None,
             max_size: Some(1048576),
             max_files: Some(5),

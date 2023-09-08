@@ -14,6 +14,11 @@ fn get_logging_valid_paths() -> Json<Vec<PathBuf>> {
     Json(logging::valid_paths())
 }
 
+#[get("/logging/code-path", format = "json")]
+fn get_logging_code_path() -> Json<PathBuf> {
+    Json(logging::get_code_defined_log_path())
+}
+
 #[get("/logging/config/<path..>", format = "json")]
 fn get_logging_config(path: PathBuf) -> Option<Json<LoggingConfiguration>> {
     logging::get_config_from(&Path::new("/").join(path)).map(|config| Json(config))
@@ -79,6 +84,7 @@ pub fn rocket() -> _ {
     rocket::build().mount("/", rocket::routes![
         get_cwd,
         get_logging_valid_paths,
+        get_logging_code_path,
         get_logging_config,
         set_logging_config,
         get_ion_diagnostics_config,

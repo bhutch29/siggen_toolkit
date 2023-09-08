@@ -194,10 +194,8 @@ impl GuiApp {
             Some("Descriptive name for report .zip file. Required."),
         );
 
-        // TODO: move all calls that trigger HTTP requests out of render loop, including existence checks
-
         if self.reports.name_changed() {
-            self.reports.zip_file_path = self.in_cwd(report::zip_file_name(&self.reports.name));
+            self.reports.zip_file_path = self.in_cwd(self.model.report_zip_file_name(&self.reports.name));
             self.reports.generate_status = None;
             self.reports.file_exists = self.model.file_exists(&self.reports.zip_file_path);
             *self.reports.upload_status.lock().unwrap() = RequestStatus::Idle;
@@ -372,18 +370,20 @@ impl GuiApp {
     }
 
     fn update_report_summary(&mut self) {
+        // TODO: backend
         let path = logging::get_log_path();
         self.reports.log_file_path = if path.exists() { Some(path) } else { None };
 
-        let path = logging::get_exception_log_path();
+        let path = self.model.get_exception_log_path();
         self.reports.exception_log_file_path = if path.exists() { Some(path) } else { None };
 
+        // TODO: backend
         self.reports.log_cfg_path = logging::get_path();
 
         let path = report::get_no_reset_system_settings_path();
         self.reports.no_reset_system_settings_path = if path.exists() { Some(path) } else { None };
 
-        self.reports.data_dir_state_files = report::get_data_dir_state_file_paths();
+        self.reports.data_dir_state_files = self.model.report_get_data_dir_state_file_paths();
 
         self.reports.hwconfig_path = hwconfig::get_path();
         self.reports.installed_version = versions::installed_version();

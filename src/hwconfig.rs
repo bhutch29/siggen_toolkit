@@ -15,7 +15,7 @@ pub fn get_path_or_cwd() -> PathBuf {
 }
 
 pub fn valid_paths() -> Vec<PathBuf> {
-    // TODO: SigGen first checks the cwd
+    // TODO: SigGen first checks it's cwd.
     if cfg!(windows) {
         vec![dirs::document_dir(), Some(PathBuf::from("E:\\"))]
     } else {
