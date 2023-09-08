@@ -3,14 +3,15 @@ use std::{
     time::Duration,
 };
 
-use crate::{logging::{self, LoggingConfiguration, Template}, common, report};
+use crate::{logging::{self, LoggingConfiguration, Template}, common, report, versions};
 
 pub trait Model {
     fn name(&self) -> &str;
     fn file_exists(&self, path: &Path) -> bool;
-    fn logging_get_path(&self) -> Option<PathBuf>;
+    fn logging_get_config_path(&self) -> Option<PathBuf>;
     fn logging_valid_paths(&self) -> Vec<PathBuf>;
     fn logging_get_config_from(&self, path: &Path) -> Option<LoggingConfiguration>;
+    fn logging_get_log_path_from_current_config(&self) -> PathBuf;
     fn logging_set_config(&self, path: &Path, config: LoggingConfiguration) -> anyhow::Result<()>;
     fn logging_get_template(&self, template: &Template) -> LoggingConfiguration;
     fn get_cwd(&self) -> PathBuf;
@@ -19,6 +20,7 @@ pub trait Model {
     fn report_get_data_dir_state_file_paths(&self) -> Vec<String>;
     fn report_zip_file_name(&self, name: &str) -> String;
     fn report_create_report(&self, name: &str) -> anyhow::Result<()>;
+    fn versions_download_dir(&self, branch: &str) -> PathBuf;
 }
 
 #[derive(Default)]
@@ -48,8 +50,8 @@ impl Model for NativeModel {
         path.exists() && path.is_file()
     }
 
-    fn logging_get_path(&self) -> Option<PathBuf> {
-        logging::get_path()
+    fn logging_get_config_path(&self) -> Option<PathBuf> {
+        logging::get_config_path()
     }
 
     fn logging_valid_paths(&self) -> Vec<PathBuf> {
@@ -58,6 +60,10 @@ impl Model for NativeModel {
 
     fn logging_get_config_from(&self, path: &Path) -> Option<LoggingConfiguration> {
         logging::get_config_from(path)
+    }
+
+    fn logging_get_log_path_from_current_config(&self) -> PathBuf {
+        logging::get_log_path_from_current_config()
     }
 
     fn logging_set_config(&self, path: &Path, config: LoggingConfiguration) -> anyhow::Result<()> {
@@ -93,6 +99,10 @@ impl Model for NativeModel {
     fn report_create_report(&self, name: &str) -> anyhow::Result<()> {
         report::create_report(name)
     }
+
+    fn versions_download_dir(&self, branch: &str) -> PathBuf {
+        versions::download_dir(branch)
+    }
 }
 
 impl HttpClientModel {
@@ -123,10 +133,10 @@ impl Model for HttpClientModel {
         }
     }
 
-    fn logging_get_path(&self) -> Option<PathBuf> {
+    fn logging_get_config_path(&self) -> Option<PathBuf> {
         #[cfg(debug_assertions)]
         println!("Sending logging_get_path request");
-        match self.create_get_request("logging/path").send() {
+        match self.create_get_request("logging/config-path").send() {
             Ok(response) => serde_json::from_str(&response.text().unwrap_or_default())
                 .ok()
                 .unwrap_or_default(),
@@ -158,6 +168,20 @@ impl Model for HttpClientModel {
             .create_get_request(&format!("logging/config{}", path.to_string_lossy()))
             .send();
         match response {
+            Ok(response) => serde_json::from_str(&response.text().unwrap_or_default())
+                .ok()
+                .unwrap_or_default(),
+            Err(err) => {
+                println!("{:?}", err);
+                Default::default()
+            }
+        }
+    }
+
+    fn logging_get_log_path_from_current_config(&self) -> PathBuf {
+        #[cfg(debug_assertions)]
+        println!("Sending logging_get_log_path_from_current_config request");
+        match self.create_get_request("logging/log-path-from-current-config").send() {
             Ok(response) => serde_json::from_str(&response.text().unwrap_or_default())
                 .ok()
                 .unwrap_or_default(),
@@ -300,6 +324,21 @@ impl Model for HttpClientModel {
             Err(err) => {
                 println!("{:?}", err);
                 Result::Err(err.into())
+            }
+        }
+    }
+
+    fn versions_download_dir(&self, branch: &str) -> PathBuf {
+        #[cfg(debug_assertions)]
+        println!("Sending versions_download_dir request");
+        let response = self.create_get_request(&format!("versions/download-dir/{}", branch)).send();
+        match response {
+            Ok(response) => serde_json::from_str(&response.text().unwrap_or_default())
+                .ok()
+                .unwrap_or_default(),
+            Err(err) => {
+                println!("{:?}", err);
+                Default::default()
             }
         }
     }

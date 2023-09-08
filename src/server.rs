@@ -10,9 +10,9 @@ fn get_cwd() -> Json<PathBuf> {
     Json(common::in_cwd(PathBuf::new()))
 }
 
-#[get("/logging/path", format = "json")]
-fn get_logging_path() -> Json<Option<PathBuf>> {
-    Json(logging::get_path())
+#[get("/logging/config-path", format = "json")]
+fn get_logging_config_path() -> Json<Option<PathBuf>> {
+    Json(logging::get_config_path())
 }
 
 #[get("/logging/valid-paths", format = "json")]
@@ -28,6 +28,11 @@ fn get_logging_code_path() -> Json<PathBuf> {
 #[get("/logging/config/<path..>", format = "json")]
 fn get_logging_config(path: PathBuf) -> Option<Json<LoggingConfiguration>> {
     logging::get_config_from(&Path::new("/").join(path)).map(|config| Json(config))
+}
+
+#[get("/logging/log-path-from-current-config", format = "json")]
+fn get_logging_log_path_from_current_config() -> Json<PathBuf> {
+    Json(logging::get_log_path_from_current_config())
 }
 
 #[post("/logging/config/<path..>", format = "json", data = "<config>")]
@@ -94,10 +99,11 @@ fn delete_file(path: PathBuf) -> std::io::Result<()> {
 pub fn rocket() -> _ {
     rocket::build().mount("/", rocket::routes![
         get_cwd,
-        get_logging_path,
+        get_logging_config_path,
         get_logging_valid_paths,
         get_logging_code_path,
         get_logging_config,
+        get_logging_log_path_from_current_config,
         set_logging_config,
         get_logging_template,
         get_ion_diagnostics_config,

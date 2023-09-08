@@ -26,7 +26,7 @@ pub fn create_report(name: &str) -> anyhow::Result<()> {
         zip.write_all(hostname.as_bytes())?;
     }
 
-    let path = logging::get_log_path();
+    let path = logging::get_log_path_from_current_config();
     if path.exists() {
         writeln!(summary, "Log File Path: {}", path.display())?;
         add_file(&mut zip, path)?;
@@ -38,7 +38,7 @@ pub fn create_report(name: &str) -> anyhow::Result<()> {
         add_file(&mut zip, path)?;
     }
 
-    if let Some(path) = logging::get_path() {
+    if let Some(path) = logging::get_config_path() {
         writeln!(summary, "Log Config Path: {}", path.display())?;
         add_file(&mut zip, path)?;
     }

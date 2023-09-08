@@ -172,7 +172,7 @@ pub enum Template {
     Licensing,
 }
 
-pub fn get_path() -> Option<PathBuf> {
+pub fn get_config_path() -> Option<PathBuf> {
     for path in valid_paths() {
         if path.exists() {
             return Some(path);
@@ -181,8 +181,8 @@ pub fn get_path() -> Option<PathBuf> {
     None
 }
 
-pub fn get_path_or_cwd() -> PathBuf {
-    get_path().unwrap_or_else(|| in_cwd(FILE_NAME))
+pub fn get_config_path_or_cwd() -> PathBuf {
+    get_config_path().unwrap_or_else(|| in_cwd(FILE_NAME))
 }
 
 pub fn valid_paths() -> Vec<PathBuf> {
@@ -217,8 +217,8 @@ pub fn get_code_defined_log_path() -> PathBuf {
     PathBuf::from(CODE_DEFINED_LOG_PATH)
 }
 
-pub fn get_log_path() -> PathBuf {
-    get_config_from(&get_path_or_cwd())
+pub fn get_log_path_from_current_config() -> PathBuf {
+    get_config_from(&get_config_path_or_cwd())
         .and_then(|config| {
             config.sinks.iter().find_map(|sink| match sink {
                 Sink::File { file_name, .. }
@@ -237,7 +237,7 @@ pub fn get_exception_log_path() -> PathBuf {
 pub fn show() -> anyhow::Result<()> {
     println!(
         "{}",
-        serde_json::to_string_pretty(&get_config_from(&get_path_or_cwd()))?
+        serde_json::to_string_pretty(&get_config_from(&get_config_path_or_cwd()))?
     );
     Ok(())
 }

@@ -57,12 +57,15 @@ impl epi::App for GuiApp {
                     }
                 });
                 ui.separator();
-                // for tab in Tabs::iter() {
-                //     // Hide LogViewer in Release builds for now
-                //     if cfg!(debug_assertions) || tab != Tabs::LogViewer {
-                //         self.make_tab(ui, Some(tab));
-                //     }
-                // }
+                for tab in Tabs::iter() {
+                    // Hide LogViewer in Release builds for now
+                    // if cfg!(debug_assertions) || tab != Tabs::LogViewer {
+                    // Hide IonDiagnostics on wasm
+                    // if tab != Tabs::IonDiagnostics || cfg!(not(target_arch = "wasm32")) {
+                    if tab != Tabs::IonDiagnostics { // TODO: Ion Diagnostics is broken, fix it
+                        self.make_tab(ui, Some(tab));
+                    }
+                }
 
                 ui.with_layout(egui::Layout::right_to_left(), |ui| {
                     self.make_tab(ui, None);
@@ -89,10 +92,12 @@ impl epi::App for GuiApp {
                     self.logging(ui);
                 }
                 Some(Tabs::Packages) => {
-                    versions(ui, frame, &mut self.packages);
+                    let selected_branch = self.packages.selected_branch.clone();
+                    versions(ui, frame, &mut self.packages, &self.model.versions_download_dir(&selected_branch));
                 }
                 Some(Tabs::Installers) => {
-                    versions(ui, frame, &mut self.installers);
+                    let selected_branch = self.packages.selected_branch.clone();
+                    versions(ui, frame, &mut self.installers, &self.model.versions_download_dir(&selected_branch));
                 }
                 Some(Tabs::Reports) => {
                     self.report(ui, frame);
@@ -111,14 +116,12 @@ impl epi::App for GuiApp {
     }
 
     fn setup(&mut self, ctx: &egui::Context, _frame: &epi::Frame, _storage: Option<&dyn epi::Storage>) {
-        // TODO: hide ion_diagnostics tab on wasm
-
         ctx.set_visuals(Visuals::dark());
         self.cwd = self.model.get_cwd();
         // TODO: backend
-        self.logger.config = self.model.logging_get_config_from(&logging::get_path_or_cwd()).unwrap_or_default();
-        // TODO: backend
-        self.logger.loaded_from = Some(logging::get_path_or_cwd());
+        let logging_config_path = logging::get_config_path_or_cwd();
+        self.logger.config = self.model.logging_get_config_from(&logging_config_path).unwrap_or_default();
+        self.logger.loaded_from = Some(logging_config_path);
         let logger_cwd_path = self.in_cwd(hwconfig::FILE_NAME);
         self.logger.cwd_path_info = PathInfo {
             path: logger_cwd_path.clone(),
@@ -367,14 +370,13 @@ impl GuiApp {
     }
 
     fn update_report_summary(&mut self) {
-        // TODO: backend
-        let path = logging::get_log_path();
+        let path = self.model.logging_get_log_path_from_current_config();
         self.reports.log_file_path = if path.exists() { Some(path) } else { None };
 
         let path = self.model.get_exception_log_path();
         self.reports.exception_log_file_path = if path.exists() { Some(path) } else { None };
 
-        self.reports.log_cfg_path = self.model.logging_get_path();
+        self.reports.log_cfg_path = self.model.logging_get_config_path();
 
         let path = report::get_no_reset_system_settings_path();
         self.reports.no_reset_system_settings_path = if path.exists() { Some(path) } else { None };
@@ -930,7 +932,7 @@ fn about(ui: &mut Ui) {
     ui.label(format!("Authors: {}", AUTHORS));
 }
 
-fn versions(ui: &mut Ui, frame: &epi::Frame, state: &mut VersionsState) {
+fn versions(ui: &mut Ui, frame: &epi::Frame, state: &mut VersionsState, download_dir: &Path) {
     state.setup_if_needed();
 
     ui.horizontal(|ui| {
@@ -957,8 +959,7 @@ fn versions(ui: &mut Ui, frame: &epi::Frame, state: &mut VersionsState) {
             });
         columns[0].horizontal(|ui| {
             ui.label("Download Directory:");
-            // TODO: backend
-            copyable_path(ui, &versions::download_dir(&state.selected_branch));
+            copyable_path(ui, download_dir);
         });
         columns[0].separator();
 

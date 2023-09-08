@@ -6,9 +6,10 @@ pub fn in_cwd<P: AsRef<Path>>(file: P) -> PathBuf {
 }
 
 pub fn open_explorer(path: &Path) -> anyhow::Result<()> {
-    // TODO: do nothing if wasm
+    #[cfg(not(target_arch = "wasm32"))]
     process::Command::new(if cfg!(windows) { "explorer" } else { "xdg-open" })
         .arg(path.parent().unwrap())
         .spawn()?;
+
     Ok(())
 }

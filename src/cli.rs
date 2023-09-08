@@ -83,7 +83,7 @@ pub fn run(command: Command) -> anyhow::Result<()> {
                 }
             }
             LogCommand::SinkPath => {
-                println!("{}", logging::get_log_path().display());
+                println!("{}", logging::get_log_path_from_current_config().display());
             }
         },
         Command::Report(cmd) => match cmd {
