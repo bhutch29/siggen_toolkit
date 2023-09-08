@@ -1,4 +1,3 @@
-use crate::common::in_cwd;
 use crate::gui_state::{FilterOptions, HwconfigState, IonDiagnosticsState, LoggingState, LogViewerState, PathInfo, ReportsState, VersionsFilter, VersionsState, VersionsTypes};
 use crate::logging::{Bool, Level, Logger, Sink, Template};
 use crate::model::Model;
@@ -113,7 +112,7 @@ impl epi::App for GuiApp {
 
     fn setup(&mut self, ctx: &egui::Context, frame: &epi::Frame, _storage: Option<&dyn epi::Storage>) {
         ctx.set_visuals(Visuals::dark());
-        self.cwd = in_cwd(PathBuf::new());
+        self.cwd = self.model.get_cwd();
         self.logger.config = self.model.logging_get_config_from(&logging::get_path_or_cwd()).unwrap_or_default();
         self.logger.loaded_from = Some(logging::get_path_or_cwd());
         let logger_cwd_path = self.in_cwd(hwconfig::FILE_NAME);

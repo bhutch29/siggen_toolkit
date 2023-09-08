@@ -3,7 +3,7 @@ use std::{
     time::Duration,
 };
 
-use crate::logging::{self, LoggingConfiguration};
+use crate::{logging::{self, LoggingConfiguration}, common};
 
 pub trait Model {
     fn name(&self) -> &str;
@@ -11,6 +11,7 @@ pub trait Model {
     fn logging_valid_paths(&self) -> Vec<PathBuf>;
     fn logging_get_config_from(&self, path: &Path) -> Option<LoggingConfiguration>;
     fn logging_set_config(&self, path: &Path, config: LoggingConfiguration) -> anyhow::Result<()>;
+    fn get_cwd(&self) -> PathBuf;
 }
 
 #[derive(Default)]
@@ -51,6 +52,10 @@ impl Model for NativeModel {
     fn logging_set_config(&self, path: &Path, config: LoggingConfiguration) -> anyhow::Result<()> {
         std::fs::write(path, serde_json::to_string_pretty(&config)?)?;
         Ok(())
+    }
+
+    fn get_cwd(&self) -> PathBuf {
+        common::in_cwd(PathBuf::new())
     }
 }
 
@@ -115,7 +120,7 @@ impl Model for HttpClientModel {
 
     fn logging_set_config(&self, path: &Path, config: LoggingConfiguration) -> anyhow::Result<()> {
         #[cfg(debug_assertions)]
-        println!("Sending logging_get_config_from request: {}", path.to_string_lossy());
+        println!("Sending logging_set_config request: {}", path.to_string_lossy());
         let response = self
             .client
             .post(format!(
@@ -130,6 +135,21 @@ impl Model for HttpClientModel {
             Err(err) => {
                 println!("{:?}", err);
                 Result::Err(err.into())
+            }
+        }
+    }
+
+    fn get_cwd(&self) -> PathBuf {
+        #[cfg(debug_assertions)]
+        println!("Sending get_cwd request");
+        let response = self.create_get_request("cwd").send();
+        match response {
+            Ok(response) => serde_json::from_str(&response.text().unwrap_or_default())
+                .ok()
+                .unwrap_or_default(),
+            Err(err) => {
+                println!("{:?}", err);
+                Default::default()
             }
         }
     }

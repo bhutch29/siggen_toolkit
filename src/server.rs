@@ -1,8 +1,13 @@
 use std::path::{Path, PathBuf};
-use crate::{ion_diagnostics, logging, report};
+use crate::{ion_diagnostics, logging, report, common};
 use rocket::{serde::json::Json, get, post, launch, http::Status, delete};
 use crate::ion_diagnostics::DiagnosticsConfiguration;
 use crate::logging::LoggingConfiguration;
+
+#[get("/cwd", format = "json")]
+fn get_cwd() -> Json<PathBuf> {
+    Json(common::in_cwd(PathBuf::new()))
+}
 
 #[get("/logging/valid-paths", format = "json")]
 fn get_logging_valid_paths() -> Json<Vec<PathBuf>> {
@@ -72,6 +77,7 @@ fn delete_file(path: PathBuf) -> std::io::Result<()> {
 #[launch]
 pub fn rocket() -> _ {
     rocket::build().mount("/", rocket::routes![
+        get_cwd,
         get_logging_valid_paths,
         get_logging_config,
         set_logging_config,

@@ -1,7 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::process;
 
-// TODO: backend
 pub fn in_cwd<P: AsRef<Path>>(file: P) -> PathBuf {
     std::env::current_dir().unwrap().join(file)
 }
