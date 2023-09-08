@@ -184,7 +184,6 @@ pub fn get_path_or_cwd() -> PathBuf {
     get_path().unwrap_or_else(|| in_cwd(FILE_NAME))
 }
 
-// TODO: backend
 pub fn valid_paths() -> Vec<PathBuf> {
     if cfg!(windows) {
         vec![dirs::document_dir(), Some(PathBuf::from("E:\\"))]
@@ -202,7 +201,6 @@ pub fn valid_paths() -> Vec<PathBuf> {
     .collect()
 }
 
-// TODO: backend
 pub fn get_config_from(path: &Path) -> Option<LoggingConfiguration> {
     std::fs::read_to_string(path)
         .ok()

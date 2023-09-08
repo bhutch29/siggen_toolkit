@@ -114,14 +114,14 @@ impl epi::App for GuiApp {
     fn setup(&mut self, ctx: &egui::Context, frame: &epi::Frame, _storage: Option<&dyn epi::Storage>) {
         ctx.set_visuals(Visuals::dark());
         self.cwd = in_cwd(PathBuf::new());
-        self.logger.config = logging::get_config_from(&logging::get_path_or_cwd()).unwrap_or_default();
+        self.logger.config = self.model.logging_get_config_from(&logging::get_path_or_cwd()).unwrap_or_default();
         self.logger.loaded_from = Some(logging::get_path_or_cwd());
         let logger_cwd_path = self.in_cwd(hwconfig::FILE_NAME);
         self.logger.cwd_path_info = PathInfo {
             path: logger_cwd_path.clone(),
             file_exists: self.model.file_exists(&logger_cwd_path)
         };
-        for path in logging::valid_paths().iter() {
+        for path in self.model.logging_valid_paths().iter() {
             self.logger.valid_paths_info.push(PathInfo { path: path.clone(), file_exists: self.model.file_exists(path) });
         }
 
@@ -537,7 +537,7 @@ impl GuiApp {
         });
 
         if ui.add_enabled(path_info.file_exists, egui::Button::new("Load")).clicked() {
-            self.logger.config = logging::get_config_from(&path_info.path).unwrap_or_default();
+            self.logger.config = self.model.logging_get_config_from(&path_info.path).unwrap_or_default();
             self.logger.loaded_from = Some(path_info.path.clone());
         }
         if ui.button("Save").clicked() {
