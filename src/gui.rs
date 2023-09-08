@@ -383,8 +383,7 @@ impl GuiApp {
 
         self.reports.data_dir_state_files = self.model.report_get_data_dir_state_file_paths();
 
-        // TODO: backend
-        self.reports.hwconfig_path = hwconfig::get_path();
+        self.reports.hwconfig_path = self.model.hwconfig_get_path();
         // TODO: backend
         self.reports.installed_version = versions::installed_version();
 

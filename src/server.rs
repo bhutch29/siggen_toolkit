@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use crate::{ion_diagnostics, logging, report, common};
+use crate::{ion_diagnostics, logging, report, common, hwconfig};
 use rocket::{serde::json::Json, get, post, launch, http::Status, delete};
 use crate::ion_diagnostics::DiagnosticsConfiguration;
 use crate::logging::{LoggingConfiguration, Template};
@@ -95,6 +95,11 @@ fn delete_file(path: PathBuf) -> std::io::Result<()> {
     std::fs::remove_file(path)
 }
 
+#[get("/reports/exception-log-path", format = "json")]
+fn get_hwconfig_path() -> Json<Option<PathBuf>> {
+    Json(hwconfig::get_path())
+}
+
 #[launch]
 pub fn rocket() -> _ {
     rocket::build().mount("/", rocket::routes![
@@ -113,6 +118,7 @@ pub fn rocket() -> _ {
         get_exception_log_path,
         get_report_zip_file_name,
         get_file_exists,
-        delete_file
+        delete_file,
+        get_hwconfig_path
     ])
 }
