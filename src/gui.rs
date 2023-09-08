@@ -118,8 +118,8 @@ impl epi::App for GuiApp {
     fn setup(&mut self, ctx: &egui::Context, _frame: &epi::Frame, _storage: Option<&dyn epi::Storage>) {
         ctx.set_visuals(Visuals::dark());
         self.cwd = self.model.get_cwd();
-        // TODO: backend
-        let logging_config_path = logging::get_config_path_or_cwd();
+
+        let logging_config_path = self.model.logging_get_config_path().unwrap_or_else(|| self.in_cwd(logging::FILE_NAME));
         self.logger.config = self.model.logging_get_config_from(&logging_config_path).unwrap_or_default();
         self.logger.loaded_from = Some(logging_config_path);
         let logger_cwd_path = self.in_cwd(hwconfig::FILE_NAME);
