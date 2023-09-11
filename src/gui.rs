@@ -3,6 +3,7 @@ use crate::logging::{Bool, Level, Logger, Sink, Template};
 use crate::model::Model;
 use crate::versions::{FileInfo, RequestStatus, BASE_FILE_URL};
 use crate::{common, hwconfig, ion_diagnostics, logging, report, versions};
+#[cfg(not(target_arch = "arm"))]
 use clipboard::ClipboardProvider;
 use eframe::egui::Visuals;
 use eframe::{egui, egui::Ui, epi};
@@ -286,6 +287,8 @@ impl GuiApp {
                         versions::report_segments(),
                         path.file_name().unwrap().to_string_lossy()
                     );
+
+                    #[cfg(not(target_arch = "arm"))]
                     if ui.button("🗐").on_hover_text(&url).clicked() {
                         if let Ok(mut clip) = clipboard::ClipboardContext::new() {
                             let _ = clip.set_contents(url);
@@ -1115,6 +1118,7 @@ fn copyable_path(ui: &mut Ui, path: &Path) {
     }
 
     if label.secondary_clicked() {
+        #[cfg(not(target_arch = "arm"))]
         if let Ok(mut clip) = clipboard::ClipboardContext::new() {
             let _ = clip.set_contents(path.to_string_lossy().to_string());
         }

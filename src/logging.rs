@@ -1,7 +1,7 @@
 use crate::common::*;
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
-use lazy_static::lazy_static;
 use strum::{Display, EnumIter, EnumString};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -188,18 +188,22 @@ pub fn get_config_path_or_cwd() -> PathBuf {
 pub fn valid_paths() -> Vec<PathBuf> {
     if cfg!(windows) {
         vec![dirs::document_dir(), Some(PathBuf::from("E:\\"))]
+            .iter()
+            .flatten()
+            .map(|x| {
+                x.join("Keysight")
+                    .join("PathWave")
+                    .join("SignalGenerator")
+                    .join(FILE_NAME)
+            })
+            .collect()
     } else {
         vec![dirs::home_dir()]
+            .iter()
+            .flatten()
+            .map(|x| x.join("userdata").join(FILE_NAME))
+            .collect()
     }
-    .iter()
-    .flatten()
-    .map(|x| {
-        x.join("Keysight")
-            .join("PathWave")
-            .join("SignalGenerator")
-            .join(FILE_NAME)
-    })
-    .collect()
 }
 
 pub fn get_config_from(path: &Path) -> Option<LoggingConfiguration> {
@@ -255,16 +259,20 @@ pub const FILE_NAME: &str = "ksflogger.cfg";
 #[cfg(windows)]
 const CODE_DEFINED_LOG_PATH: &str = r"C:\Temp\Keysight.PathWave.SG.log";
 
-// TODO: ARM path
-#[cfg(not(windows))]
+#[cfg(all(not(windows), not(target_arch = "arm")))]
 const CODE_DEFINED_LOG_PATH: &str = "/tmp/Keysight.PathWave.SG.log";
+
+#[cfg(all(not(windows), target_arch = "arm"))]
+const CODE_DEFINED_LOG_PATH: &str = "/firmware/user/tlouser/logs/Keysight.PathWave.SG.log";
 
 #[cfg(windows)]
 const EXCEPTION_LOG_PATH: &str = r"C:\Temp\Keysight.PathWave.SG.ExceptionLog.txt";
 
-// TODO: ARM path
-#[cfg(not(windows))]
+#[cfg(all(not(windows), not(target_arch = "arm")))]
 const EXCEPTION_LOG_PATH: &str = "/tmp/Keysight.PathWave.SG.ExceptionLog.txt";
+
+#[cfg(all(not(windows), target_arch = "arm"))]
+const EXCEPTION_LOG_PATH: &str = "/firmware/user/tlouser/logs/Keysight.PathWave.SG.ExceptionLog.txt";
 
 lazy_static! {
     static ref DEFAULT_SINKS: Vec<Sink> = vec![
@@ -317,7 +325,6 @@ lazy_static! {
             },
         ]
     };
-
     static ref TEMPLATE_MOBIUS: LoggingConfiguration = LoggingConfiguration {
         sinks: DEFAULT_SINKS.clone(),
         loggers: vec![
@@ -333,7 +340,6 @@ lazy_static! {
             },
         ]
     };
-
     static ref TEMPLATE_WEBSOCKETS: LoggingConfiguration = LoggingConfiguration {
         sinks: DEFAULT_SINKS.clone(),
         loggers: vec![
@@ -354,7 +360,6 @@ lazy_static! {
             },
         ]
     };
-
     static ref TEMPLATE_MULTI_INSTRUMENT: LoggingConfiguration = LoggingConfiguration {
         sinks: DEFAULT_SINKS.clone(),
         loggers: vec![
@@ -370,7 +375,6 @@ lazy_static! {
             },
         ]
     };
-
     static ref TEMPLATE_LICENSING: LoggingConfiguration = LoggingConfiguration {
         sinks: DEFAULT_SINKS.clone(),
         loggers: vec![
@@ -390,11 +394,11 @@ lazy_static! {
 
 pub fn get_template(template: &Template) -> LoggingConfiguration {
     match template {
-        Template::GeneralPurpose => {TEMPLATE_GENERAL_PURPOSE.clone()}
-        Template::MonitorSghalSetups => {TEMPLATE_SGHAL_SETUPS.clone()}
-        Template::Mobius => {TEMPLATE_MOBIUS.clone()}
-        Template::Websockets => {TEMPLATE_WEBSOCKETS.clone()}
-        Template::MultiInstrumentGrpc => {TEMPLATE_MULTI_INSTRUMENT.clone()}
-        Template::Licensing => {TEMPLATE_LICENSING.clone()}
+        Template::GeneralPurpose => TEMPLATE_GENERAL_PURPOSE.clone(),
+        Template::MonitorSghalSetups => TEMPLATE_SGHAL_SETUPS.clone(),
+        Template::Mobius => TEMPLATE_MOBIUS.clone(),
+        Template::Websockets => TEMPLATE_WEBSOCKETS.clone(),
+        Template::MultiInstrumentGrpc => TEMPLATE_MULTI_INSTRUMENT.clone(),
+        Template::Licensing => TEMPLATE_LICENSING.clone(),
     }
 }

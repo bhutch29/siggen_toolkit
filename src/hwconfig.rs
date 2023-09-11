@@ -18,23 +18,26 @@ pub fn valid_paths() -> Vec<PathBuf> {
     // TODO: SigGen first checks it's cwd.
     if cfg!(windows) {
         vec![dirs::document_dir(), Some(PathBuf::from("E:\\"))]
+            .iter()
+            .flatten()
+            .map(|x| {
+                x.join("Keysight")
+                    .join("PathWave")
+                    .join("SignalGenerator")
+                    .join(FILE_NAME)
+            })
+            .collect()
     } else {
         vec![dirs::home_dir()]
+            .iter()
+            .flatten()
+            .map(|x| x.join("userdata").join(FILE_NAME))
+            .collect()
     }
-    .iter()
-    .flatten()
-    .map(|x| {
-        x.join("Keysight")
-            .join("PathWave")
-            .join("SignalGenerator")
-            .join(FILE_NAME)
-    })
-    .collect()
 }
 
 pub fn set_text(path: &Path, text: &String) -> anyhow::Result<()> {
-    std::fs::create_dir_all(path.parent().unwrap())
-        .and_then(|_| std::fs::write(path, text))?;
+    std::fs::create_dir_all(path.parent().unwrap()).and_then(|_| std::fs::write(path, text))?;
     Ok(())
 }
 

@@ -1,16 +1,13 @@
 [package]
 name = "sgt"
-version = "1.0.6"
+version = "1.1.0"
 authors = ["Bradley Hutchinson <bradley.hutchinson@keysight.com>"]
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 structopt = "0.3"
-reqwest = {version = "0.11", features = ["blocking"]}
+reqwest = {version = "0.11", default-features = false, features = ["blocking", "rustls-tls"]}
 eframe = { version = "*", default-features = false, features = ["default_fonts", "egui_glow"] }
-clipboard = "0.5"
 strum = {version = "0.23", features = ["derive"]}
 serde = {version = "1.0", features=["derive"]}
 serde_json = "1.0"
@@ -24,9 +21,11 @@ gethostname = "0.2.1"
 random_word = "0.3.0"
 lazy_static = "1.4.0"
 rocket = { version = "0.5.0-rc.2", features = ["json"] }
+wasm-bindgen = "0.2"
 
 [target.'cfg(windows)'.dependencies]
 win-event-log = { git = "https://github.com/rustysec/win-event-log-rs" }
 
-[target.'cfg(windows)'.build-dependencies]
-winres = "0.1.12"
+[target.'cfg(not(target_arch = "arm"))'.dependencies]
+clipboard = "0.5"
+
