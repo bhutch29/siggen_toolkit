@@ -125,7 +125,7 @@ impl epi::App for GuiApp {
         let logging_config_path = self.model.logging_get_config_path().unwrap_or_else(|| self.in_cwd(logging::FILE_NAME));
         self.logger.config = self.model.logging_get_config_from(&logging_config_path).unwrap_or_default();
         self.logger.loaded_from = Some(logging_config_path);
-        let logger_cwd_path = self.in_cwd(hwconfig::FILE_NAME);
+        let logger_cwd_path = self.in_cwd(logging::FILE_NAME);
         self.logger.cwd_path_info = PathInfo {
             path: logger_cwd_path.clone(),
             file_exists: self.model.file_exists(&logger_cwd_path)
